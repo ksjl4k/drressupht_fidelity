@@ -22,6 +22,36 @@ function generateDressupMemberId(firstName: string): string {
   return `${cleanFirstName}-${randomNumber}`;
 }
 
+// Helper function to convert Square birthday format to JJ/MM format
+function formatBirthdayToJJMM(squareBirthday: string | null): string | null {
+  if (!squareBirthday) return null;
+
+  try {
+    // Square typically returns birthdays as YYYY-MM-DD, YYYY-MM, or MM-DD
+    const parts = squareBirthday.split(/[-/]/);
+    if (parts.length >= 3) {
+      // Format: YYYY-MM-DD -> parts[1] is MM, parts[2] is JJ (DD)
+      const month = parts[1];
+      const day = parts[2];
+      return `${day}/${month}`;
+    } else if (parts.length === 2) {
+      // Format: MM-DD or YYYY-MM
+      // Assuming standard ISO style where first might be year or month depending on length
+      if (parts[0].length === 4) {
+        // YYYY-MM
+        return null; // Day is missing
+      } else {
+        // MM-DD -> convert to JJ/MM
+        return `${parts[1]}/${parts[0]}`;
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing birthday:", e);
+  }
+
+  return squareBirthday; // Fallback to raw string if format is unexpected
+}
+
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -94,6 +124,9 @@ serve(async (req) => {
         squareCustomer.reference_id ||
         generateDressupMemberId(squareCustomer.given_name || "customer");
 
+      // Convert birthday to JJ/MM format
+      const formattedBirthday = formatBirthdayToJJMM(squareCustomer.birthday);
+
       // Save the customer in Supabase.
       const { error: customerError } = await supabaseAdmin
         .from("customers")
@@ -104,7 +137,7 @@ serve(async (req) => {
             last_name: squareCustomer.family_name || "Unknown",
             email: squareCustomer.email_address || null,
             phone: squareCustomer.phone_number || "UNKNOWN",
-            birthday: squareCustomer.birthday || null,
+            birthday: formattedBirthday,
             square_customer_id: squareCustomerId,
           },
           {
