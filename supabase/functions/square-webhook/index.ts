@@ -22,34 +22,26 @@ function generateDressupMemberId(firstName: string): string {
   return `${cleanFirstName}-${randomNumber}`;
 }
 
-// Helper function to convert Square birthday format to JJ/MM format
-function formatBirthdayToJJMM(squareBirthday: string | null): string | null {
+// Helper function to convert Square birthday (YYYY-MM-DD) to JJ/MM format (DD/MM)
+function formatBirthdayToJJMM(squareBirthday: string | null | undefined): string | null {
   if (!squareBirthday) return null;
 
   try {
-    // Square typically returns birthdays as YYYY-MM-DD, YYYY-MM, or MM-DD
     const parts = squareBirthday.split(/[-/]/);
     if (parts.length >= 3) {
-      // Format: YYYY-MM-DD -> parts[1] is MM, parts[2] is JJ (DD)
+      // YYYY-MM-DD -> parts[1] is MM, parts[2] is DD (JJ)
       const month = parts[1];
       const day = parts[2];
       return `${day}/${month}`;
     } else if (parts.length === 2) {
-      // Format: MM-DD or YYYY-MM
-      // Assuming standard ISO style where first might be year or month depending on length
-      if (parts[0].length === 4) {
-        // YYYY-MM
-        return null; // Day is missing
-      } else {
-        // MM-DD -> convert to JJ/MM
-        return `${parts[1]}/${parts[0]}`;
-      }
+      // MM-DD -> DD/MM
+      return `${parts[1]}/${parts[0]}`;
     }
   } catch (e) {
     console.error("Error parsing birthday:", e);
   }
 
-  return squareBirthday; // Fallback to raw string if format is unexpected
+  return null;
 }
 
 serve(async (req) => {
@@ -79,18 +71,18 @@ serve(async (req) => {
     // ---------------------------------------------------------
 
     if (eventType === "customer.created") {
+      // Match the exact nesting structure from Square's webhook payload
       const squareCustomer = payload.data?.object?.customer;
 
       if (!squareCustomer) {
         return new Response(
           JSON.stringify({ message: "No customer found in webhook" }),
-          { headers: { "Content-Type": "application/json" }, status: 200 }
+          {
+            headers: { "Content-Type": "application/json" },
+            status: 200,
+          }
         );
       }
-
-      // DEBUG: Log the raw customer object and birthday from Square
-      console.log("SQUARE RAW CUSTOMER OBJECT:", JSON.stringify(squareCustomer));
-      console.log("SQUARE RAW BIRTHDAY:", squareCustomer.birthday);
 
       const squareCustomerId = squareCustomer.id;
 
@@ -124,7 +116,7 @@ serve(async (req) => {
         squareCustomer.reference_id ||
         generateDressupMemberId(squareCustomer.given_name || "customer");
 
-      // Convert birthday to JJ/MM format
+      // Convert birthday from YYYY-MM-DD to JJ/MM
       const formattedBirthday = formatBirthdayToJJMM(squareCustomer.birthday);
 
       // Save the customer in Supabase.
@@ -186,7 +178,7 @@ serve(async (req) => {
       }
 
       console.log(
-        `Customer synced: Square ${squareCustomerId} → ${dressupMemberId}`
+        `Customer synced: Square ${squareCustomerId} → ${dressupMemberId} with birthday: ${formattedBirthday}`
       );
 
       return new Response(
@@ -195,6 +187,7 @@ serve(async (req) => {
           message: "Customer synced successfully",
           square_customer_id: squareCustomerId,
           dressup_member_id: dressupMemberId,
+          birthday: formattedBirthday,
         }),
         {
           headers: { "Content-Type": "application/json" },
