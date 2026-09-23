@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DressupHT - Mon Suivi de Récompenses</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Include Supabase and QR Code library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Back Button Header -->
+    <div style="margin-bottom: 15px;">
+      <a href="index.html" class="btn secondary-btn" style="text-decoration: none; display: inline-block; padding: 8px 12px; font-size: 13px; width: auto;">
+        ← Retour à l'accueil
+      </a>
+    </div>
+
+    <header>
+      <h1>Suivi de Récompenses</h1>
+      <p>Entrez vos informations pour consulter vos points et avantages.</p>
+    </header>
+
+    <!-- Login Form -->
+    <form id="rewards-login-form">
+      <div class="form-group">
+        <label for="ref-id">Identifiant (ex: jean-482910)</label>
+        <input type="text" id="ref-id" placeholder="prenom-123456" required>
+      </div>
+
+      <div class="form-group">
+        <label for="check-birthday">Date de naissance (JJ/MM)</label>
+        <input type="text" id="check-birthday" placeholder="JJ/MM" maxlength="5" required>
+      </div>
+
+      <button type="submit" id="login-btn">Voir mes récompenses</button>
+      <p id="error-message" class="error-text"></p>
+    </form>
+
+    <!-- Success View (Hidden by default) -->
+    <div id="rewards-dashboard" class="hidden">
+      <div class="card">
+        <h2>Bienvenue, <span id="dash-name"></span> !</h2>
+        <p style="margin-top: 5px;">ID: <strong id="dash-id"></strong></p>
+        
+        <div class="points-box">
+          <p style="font-size: 0.9rem; margin: 0; color: #136f9a; font-weight: 600;">Solde de points :</p>
+          <span id="dash-points" style="font-size: 2rem; font-weight: bold; color: #136f9a;">0</span> pts
+        </div>
+
+        <div id="qrcode"></div>
+        
+        <button id="logout-btn" class="secondary-btn">Se déconnecter</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="rewards.js"></script>
+</body>
+</html>

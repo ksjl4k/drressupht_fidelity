@@ -1,125 +1,182 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap');
+
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Sora", sans-serif;
 }
 
 body {
-  margin: 0;
-  font-family: "Sora", sans-serif;
   background: #f8f6f2;
   color: #2c3e50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
 }
 
 .container {
-  width: min(90%, 420px);
-  margin: 60px auto;
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  padding: 24px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
 }
 
 h1 {
-  margin-bottom: 8px;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #136f9a;
 }
 
 p {
   color: #666;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 form {
-  margin-top: 30px;
+  margin-top: 15px;
 }
 
 label {
   display: block;
-  margin-top: 18px;
+  margin-top: 14px;
   margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
 }
 
 input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 16px;
+  padding: 12px 14px;
+  border: 1px solid #dcd6cd;
+  border-radius: 8px;
+  font-size: 16px; /* Prevents auto-zoom on mobile Safari/Chrome */
+  font-family: "Sora", sans-serif;
+  background: #faf9f6;
+  color: #2c3e50;
+  outline: none;
+  transition: border-color 0.2s;
 }
 
-button {
+input:focus {
+  border-color: #136f9a;
+  background: #fff;
+}
+
+button, .btn {
   width: 100%;
-  margin-top: 25px;
+  margin-top: 20px;
   padding: 13px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 8px;
   background: #136f9a;
   color: white;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: "Sora", sans-serif;
   cursor: pointer;
-}
-
-button:hover {
-  opacity: 0.9;
-}
-
-/* Add these styles to your existing style.css */
-
-.hidden {
-  display: none !important;
-}
-
-#success-card {
-  margin-top: 30px;
-  background: #ffffff;
-  padding: 30px;
-  border-radius: 8px;
-  border: 1px solid #e1ded8;
   text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  transition: opacity 0.2s;
 }
 
-.member-id-box {
-  background: #f8f6f2;
-  border: 2px dashed #136f9a;
-  padding: 15px;
-  margin: 20px 0;
-  border-radius: 6px;
-}
-
-.label-small {
-  display: block;
-  font-size: 12px;
-  text-transform: uppercase;
-  color: #666;
-  margin-bottom: 5px;
-}
-
-#display-member-id {
-  font-size: 24px;
-  color: #136f9a;
-  letter-spacing: 1px;
-}
-
-.instruction-text {
-  font-size: 14px;
-  color: #555;
-  margin-bottom: 20px;
+button:hover, .btn:hover {
+  opacity: 0.9;
 }
 
 .secondary-btn {
   background: #e2dfd8;
   color: #2c3e50;
+  margin-top: 10px;
 }
 
 .secondary-btn:hover {
   background: #d4d0c7;
 }
 
-.qr-container {
+.hidden {
+  display: none !important;
+}
+
+#success-card, .card {
+  margin-top: 15px;
+  background: #faf9f6;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e1ded8;
+  text-align: center;
+}
+
+.member-id-box {
+  background: #ffffff;
+  border: 2px dashed #136f9a;
+  padding: 12px;
+  margin: 15px 0;
+  border-radius: 8px;
+}
+
+.label-small {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+#display-member-id, #dash-id {
+  font-size: 20px;
+  font-weight: 700;
+  color: #136f9a;
+  letter-spacing: 0.5px;
+}
+
+.instruction-text {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 15px;
+}
+
+.qr-container, #qrcode {
   background: #ffffff;
   padding: 15px;
   display: inline-block;
   border-radius: 8px;
   border: 1px solid #e1ded8;
-  margin: 10px 0 15px 0;
+  margin: 15px 0;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.qr-container img {
+.qr-container img, #qrcode img {
   display: block;
   margin: 0 auto;
+}
+
+.points-box {
+  margin: 15px 0;
+  padding: 15px;
+  background: #f0f8ff;
+  border-radius: 8px;
+  border: 1px solid #d0e7f9;
+  text-align: center;
+}
+
+.error-text {
+  color: #d9534f;
+  font-size: 13px;
+  margin-top: 10px;
+  text-align: center;
 }

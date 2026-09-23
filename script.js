@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const qrCodeContainer = document.getElementById("qrcode");
   const successCard = document.getElementById("success-card");
   const birthdayInput = document.getElementById("birthday");
+  const phoneInput = document.getElementById("phone");
 
   // Helper function to capitalize names (handles hyphenated names too)
   const capitalizeName = (str) => {
@@ -16,8 +17,6 @@ document.addEventListener("DOMContentLoaded", () => {
       .map(word => word.split("-").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join("-"))
       .join(" ");
   };
-
-  const phoneInput = document.getElementById("phone");
 
   if (phoneInput) {
     // Ensure it starts with +509 if empty on load
@@ -59,6 +58,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const email = document.getElementById("email").value.trim();
       const birthday = birthdayInput ? birthdayInput.value.trim() : "";
 
+      // Generate a friendly reference ID: firstname-6digits (e.g., jean-482910)
+      const randomDigits = Math.floor(100000 + Math.random() * 900000);
+      const cleanFirstName = firstName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z]/g, "");
+      const referenceId = `${cleanFirstName || "client"}-${randomDigits}`;
+
       // 1. Save to Supabase
       const { data, error } = await supabaseClient
         .from("customers")
@@ -67,7 +75,8 @@ document.addEventListener("DOMContentLoaded", () => {
           last_name: lastName,
           phone: phone,
           email: email || null,
-          birthday: birthday || null // Will save as "DD/MM" string
+          birthday: birthday || null, // Saved as "DD/MM" string
+          dressup_member_id: referenceId // Passwordless reference ID
         })
         .select()
         .single();
