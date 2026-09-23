@@ -1,0 +1,125 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Sora", sans-serif;
+  background: #f8f6f2;
+  color: #2c3e50;
+}
+
+.container {
+  width: min(90%, 420px);
+  margin: 60px auto;
+}
+
+h1 {
+  margin-bottom: 8px;
+}
+
+p {
+  color: #666;
+}
+
+form {
+  margin-top: 30px;
+}
+
+label {
+  display: block;
+  margin-top: 18px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+button {
+  width: 100%;
+  margin-top: 25px;
+  padding: 13px;
+  border: 0;
+  border-radius: 4px;
+  background: #136f9a;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+/* Add these styles to your existing style.css */
+
+.hidden {
+  display: none !important;
+}
+
+#success-card {
+  margin-top: 30px;
+  background: #ffffff;
+  padding: 30px;
+  border-radius: 8px;
+  border: 1px solid #e1ded8;
+  text-align: center;
+}
+
+.member-id-box {
+  background: #f8f6f2;
+  border: 2px dashed #136f9a;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 6px;
+}
+
+.label-small {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+#display-member-id {
+  font-size: 24px;
+  color: #136f9a;
+  letter-spacing: 1px;
+}
+
+.instruction-text {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 20px;
+}
+
+.secondary-btn {
+  background: #e2dfd8;
+  color: #2c3e50;
+}
+
+.secondary-btn:hover {
+  background: #d4d0c7;
+}
+
+.qr-container {
+  background: #ffffff;
+  padding: 15px;
+  display: inline-block;
+  border-radius: 8px;
+  border: 1px solid #e1ded8;
+  margin: 10px 0 15px 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.qr-container img {
+  display: block;
+  margin: 0 auto;
+}
