@@ -1,0 +1,993 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+supabase/
+  .temp/
+    gotrue-version
+    linked-project.json
+    pooler-url
+    postgres-version
+    project-ref
+    rest-version
+    storage-migration
+    storage-version
+  functions/
+    square-webhook/
+      index.ts
+    sync-square/
+      index.ts
+.gitignore
+config.js
+index.html
+rewards.html
+rewards.js
+script.js
+style.css
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="supabase/.temp/gotrue-version">
+v2.197.0
+</file>
+
+<file path="supabase/.temp/linked-project.json">
+{"ref":"ifrzjoxrgoyjsyovrtsc","name":"dressupht-fidelity","organization_id":"xolilulmxalwnvzsmkqq","organization_slug":"xolilulmxalwnvzsmkqq"}
+</file>
+
+<file path="supabase/.temp/pooler-url">
+postgresql://postgres.ifrzjoxrgoyjsyovrtsc@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+</file>
+
+<file path="supabase/.temp/postgres-version">
+17.6.1.166
+</file>
+
+<file path="supabase/.temp/project-ref">
+ifrzjoxrgoyjsyovrtsc
+</file>
+
+<file path="supabase/.temp/rest-version">
+v14.5
+</file>
+
+<file path="supabase/.temp/storage-migration">
+drop-bucketid-objname-index
+</file>
+
+<file path="supabase/.temp/storage-version">
+v1.77.5
+</file>
+
+<file path=".gitignore">
+.DS_Store
+</file>
+
+<file path="config.js">
+const CONFIG = {
+  SUPABASE_URL: "my project url",
+  SUPABASE_ANON_KEY: "my anon key"
+};
+</file>
+
+<file path="supabase/functions/square-webhook/index.ts">
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+serve(async (req) => {
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+
+  try {
+    const payload = await req.json();
+    
+    const eventType = payload.type;
+    if (eventType !== "order.updated" && eventType !== "order.created") {
+      return new Response(JSON.stringify({ message: "Event ignored" }), { status: 200 });
+    }
+
+    // Extract the order ID from the webhook event
+    const squareOrderId =
+        payload.data?.object?.order_updated?.order_id ||
+        payload.data?.object?.order?.id;
+
+    if (!squareOrderId) {
+      return new Response(JSON.stringify({ message: "No order ID found in webhook" }), { status: 200 });
+    }
+
+    const SQUARE_ACCESS_TOKEN = Deno.env.get("SQUARE_ACCESS_TOKEN");
+    const SQUARE_ENVIRONMENT = Deno.env.get("SQUARE_ENVIRONMENT") || "production";
+    const squareBaseUrl = SQUARE_ENVIRONMENT === "production" 
+      ? "https://connect.squareup.com" 
+      : "https://connect.squareupsandbox.com";
+
+    // FETCH FULL ORDER DETAILS DIRECTLY FROM SQUARE API
+    const orderResponse = await fetch(`${squareBaseUrl}/v2/orders/${squareOrderId}`, {
+      method: "GET",
+      headers: {
+        "Square-Version": "2024-01-18",
+        "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`
+      }
+    });
+
+    const orderResult = await orderResponse.json();
+    const orderData = orderResult.order;
+
+    if (!orderData || orderData.state !== "COMPLETED") {
+      return new Response(JSON.stringify({ message: "Order not completed or not found" }), { status: 200 });
+    }
+
+    const squareCustomerId = orderData.customer_id;
+    const totalAmount = orderData.total_money?.amount ? orderData.total_money.amount / 100 : 0;
+    const currency = orderData.total_money?.currency || "HTG";
+    const lineItems = orderData.line_items || [];
+
+    if (!squareCustomerId) {
+      console.log("Order completed without an attached loyalty customer ID:", squareOrderId);
+      return new Response(JSON.stringify({ message: "Order has no associated customer" }), { status: 200 });
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Find the customer in Supabase
+    const { data: customer, error: custError } = await supabaseAdmin
+      .from("customers")
+      .select("id")
+      .eq("square_customer_id", squareCustomerId)
+      .single();
+
+    if (custError || !customer) {
+      console.error("Customer mapping not found for Square Customer ID:", squareCustomerId);
+      return new Response(JSON.stringify({ message: "Customer mapping not found in database" }), { status: 404 });
+    }
+
+    // Insert purchase record
+    const { error: insertError } = await supabaseAdmin
+      .from("purchases")
+      .upsert({
+        customer_id: customer.id,
+        square_order_id: squareOrderId,
+        total_amount: totalAmount,
+        currency: currency,
+        items: lineItems
+      }, { onConflict: "square_order_id" });
+
+    if (insertError) {
+      console.error("Error inserting purchase:", insertError);
+      return new Response(JSON.stringify({ error: insertError.message }), { status: 500 });
+    }
+
+    return new Response(JSON.stringify({ success: true, message: "Purchase recorded successfully" }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200,
+    });
+
+  } catch (err) {
+    console.error("Webhook error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+});
+</file>
+
+<file path="rewards.html">
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DressupHT - Mon Suivi de Récompenses</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Include Supabase and QR Code library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Back Button Header -->
+    <div style="margin-bottom: 15px;">
+      <a href="index.html" class="btn secondary-btn" style="text-decoration: none; display: inline-block; padding: 8px 12px; font-size: 13px; width: auto;">
+        ← Retour à l'accueil
+      </a>
+    </div>
+
+    <header>
+      <h1>Suivi de Récompenses</h1>
+      <p>Entrez vos informations pour consulter vos points et avantages.</p>
+    </header>
+
+    <!-- Login Form -->
+    <form id="rewards-login-form">
+      <div class="form-group">
+        <label for="ref-id">Identifiant (ex: jean-482910)</label>
+        <input type="text" id="ref-id" placeholder="prenom-123456" required>
+      </div>
+
+      <div class="form-group">
+        <label for="check-birthday">Date de naissance (JJ/MM)</label>
+        <input type="text" id="check-birthday" placeholder="JJ/MM" maxlength="5" required>
+      </div>
+
+      <button type="submit" id="login-btn">Voir mes récompenses</button>
+      <p id="error-message" class="error-text"></p>
+    </form>
+
+    <!-- Success View (Hidden by default) -->
+    <div id="rewards-dashboard" class="hidden">
+      <div class="card">
+        <h2>Bienvenue, <span id="dash-name"></span> !</h2>
+        <p style="margin-top: 5px;">ID: <strong id="dash-id"></strong></p>
+        
+        <div class="points-box">
+          <p style="font-size: 0.9rem; margin: 0; color: #136f9a; font-weight: 600;">Solde de points :</p>
+          <span id="dash-points" style="font-size: 2rem; font-weight: bold; color: #136f9a;">0</span> pts
+        </div>
+
+        <div id="qrcode"></div>
+
+        <!-- Purchase History Section -->
+        <div style="margin-top: 20px; text-align: left;">
+          <h3 style="font-size: 15px; margin-bottom: 10px; color: #2c3e50;">Historique des achats</h3>
+          <div id="purchases-list">
+            <!-- Dynamically populated purchases go here -->
+          </div>
+        </div>
+        
+        <button id="logout-btn" class="secondary-btn">Se déconnecter</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="rewards.js"></script>
+</body>
+</html>
+</file>
+
+<file path="rewards.js">
+document.addEventListener("DOMContentLoaded", () => {
+  const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  
+  const loginForm = document.getElementById("rewards-login-form");
+  const dashboard = document.getElementById("rewards-dashboard");
+  const errorMsg = document.getElementById("error-message");
+  const birthdayInput = document.getElementById("check-birthday");
+
+  // Auto-format birthday input as DD/MM
+  if (birthdayInput) {
+    birthdayInput.addEventListener("input", (e) => {
+      let value = e.target.value.replace(/\D/g, "");
+      if (value.length > 4) value = value.slice(0, 4);
+      if (value.length >= 3) {
+        value = value.slice(0, 2) + "/" + value.slice(2);
+      }
+      e.target.value = value;
+    });
+  }
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorMsg.textContent = "";
+
+    const refId = document.getElementById("ref-id").value.trim().toLowerCase();
+    const birthday = birthdayInput.value.trim();
+
+    // 1. Query Supabase for matching ID and Birthday
+    const { data: customer, error } = await supabaseClient
+      .from("customers")
+      .select("*")
+      .eq("dressup_member_id", refId)
+      .eq("birthday", birthday)
+      .single();
+
+    if (error || !customer) {
+      errorMsg.textContent = "Identifiant ou date de naissance incorrect.";
+      return;
+    }
+
+    // 2. Fetch purchases for this customer
+    const { data: purchases, error: purError } = await supabaseClient
+      .from("purchases")
+      .select("*")
+      .eq("customer_id", customer.id)
+      .order("created_at", { ascending: false });
+
+    if (purError) {
+      console.error("Erreur lors de la récupération des achats:", purError);
+    }
+
+    // Populate Dashboard Data
+    document.getElementById("dash-name").textContent = customer.first_name;
+    document.getElementById("dash-id").textContent = customer.dressup_member_id;
+    
+    // Calculate total points (e.g., 1 point per currency unit spent, or default to 0)
+    const totalSpent = purchases ? purchases.reduce((sum, p) => sum + Number(p.total_amount), 0) : 0;
+    document.getElementById("dash-points").textContent = Math.floor(totalSpent); // 1 point per HTG spent (adjust if needed)
+
+    // Render Purchases History List
+    const purchasesListContainer = document.getElementById("purchases-list");
+    if (purchasesListContainer) {
+      purchasesListContainer.innerHTML = "";
+
+      if (!purchases || purchases.length === 0) {
+        purchasesListContainer.innerHTML = `<p style="font-size: 13px; color: #666; text-align: center; margin-top: 10px;">Aucun achat récent enregistré.</p>`;
+      } else {
+        purchases.forEach(pur => {
+          const dateStr = new Date(pur.created_at).toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+          });
+
+          // Build items description
+          let itemsText = "Articles divers";
+          if (pur.items && Array.isArray(pur.items) && pur.items.length > 0) {
+            itemsText = pur.items.map(i => `${i.quantity || 1}x ${i.name}`).join(", ");
+          }
+
+          const purchaseCard = document.createElement("div");
+          purchaseCard.style.cssText = "background: #ffffff; border: 1px solid #e1ded8; padding: 12px; border-radius: 6px; margin-bottom: 10px; text-align: left;";
+          purchaseCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px;">
+              <span>${dateStr}</span>
+              <strong style="color: #136f9a;">${pur.total_amount} ${pur.currency || 'HTG'}</strong>
+            </div>
+            <div style="font-size: 13px; color: #2c3e50; font-weight: 500;">${itemsText}</div>
+          `;
+          purchasesListContainer.appendChild(purchaseCard);
+        });
+      }
+    }
+
+    // Render QR Code
+    const qrContainer = document.getElementById("qrcode");
+    qrContainer.innerHTML = "";
+    new QRCode(qrContainer, {
+      text: customer.dressup_member_id,
+      width: 180,
+      height: 180,
+      colorDark: "#136f9a",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    // Switch views
+    loginForm.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+  });
+
+  // Logout / Reset view
+  const logoutBtn = document.getElementById("logout-btn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      dashboard.classList.add("hidden");
+      loginForm.classList.remove("hidden");
+      loginForm.reset();
+    });
+  }
+});
+</file>
+
+<file path="style.css">
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Sora", sans-serif;
+}
+
+body {
+  background: #f8f6f2;
+  color: #2c3e50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.container {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  padding: 24px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #136f9a;
+}
+
+p {
+  color: #666;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+form {
+  margin-top: 15px;
+}
+
+label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #dcd6cd;
+  border-radius: 8px;
+  font-size: 16px; /* Prevents auto-zoom on mobile Safari/Chrome */
+  font-family: "Sora", sans-serif;
+  background: #faf9f6;
+  color: #2c3e50;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  border-color: #136f9a;
+  background: #fff;
+}
+
+button, .btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 13px;
+  border: 0;
+  border-radius: 8px;
+  background: #136f9a;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: "Sora", sans-serif;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  transition: opacity 0.2s;
+}
+
+button:hover, .btn:hover {
+  opacity: 0.9;
+}
+
+.secondary-btn {
+  background: #e2dfd8;
+  color: #2c3e50;
+  margin-top: 10px;
+}
+
+.secondary-btn:hover {
+  background: #d4d0c7;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#success-card, .card {
+  margin-top: 15px;
+  background: #faf9f6;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e1ded8;
+  text-align: center;
+}
+
+.member-id-box {
+  background: #ffffff;
+  border: 2px dashed #136f9a;
+  padding: 12px;
+  margin: 15px 0;
+  border-radius: 8px;
+}
+
+.label-small {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+#display-member-id, #dash-id {
+  font-size: 20px;
+  font-weight: 700;
+  color: #136f9a;
+  letter-spacing: 0.5px;
+}
+
+.instruction-text {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 15px;
+}
+
+.qr-container, #qrcode {
+  background: #ffffff;
+  padding: 15px;
+  display: inline-block;
+  border-radius: 8px;
+  border: 1px solid #e1ded8;
+  margin: 15px 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.qr-container img, #qrcode img {
+  display: block;
+  margin: 0 auto;
+}
+
+.points-box {
+  margin: 15px 0;
+  padding: 15px;
+  background: #f0f8ff;
+  border-radius: 8px;
+  border: 1px solid #d0e7f9;
+  text-align: center;
+}
+
+.error-text {
+  color: #d9534f;
+  font-size: 13px;
+  margin-top: 10px;
+  text-align: center;
+}
+</file>
+
+<file path="supabase/functions/sync-square/index.ts">
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+serve(async (req) => {
+  // Handle browser CORS preflight request
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const { record } = await req.json();
+
+    if (!record) {
+      return new Response(
+        JSON.stringify({
+          error: "No customer record provided",
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    const SQUARE_ACCESS_TOKEN = Deno.env.get("SQUARE_ACCESS_TOKEN");
+    const SQUARE_ENVIRONMENT =
+      Deno.env.get("SQUARE_ENVIRONMENT") || "sandbox";
+
+    // Choose correct Square API URL based on environment
+    const squareBaseUrl =
+      SQUARE_ENVIRONMENT === "production"
+        ? "https://connect.squareup.com"
+        : "https://connect.squareupsandbox.com";
+
+    // 1. Prepare Customer Data for Square API
+    const squareCustomerData = {
+      idempotency_key: crypto.randomUUID(),
+      given_name: record.first_name,
+      family_name: record.last_name || "",
+      phone_number: record.phone || "",
+      email_address: record.email || undefined,
+      reference_id: record.dressup_member_id,
+      note: `DressupHT Loyalty Member ID: ${record.dressup_member_id}`,
+    };
+
+    // 2. Call Square API to create/sync customer
+    const squareResponse = await fetch(
+      `${squareBaseUrl}/v2/customers`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Square-Version": "2024-01-18",
+          Authorization: `Bearer ${SQUARE_ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify(squareCustomerData),
+      }
+    );
+
+    const squareResult = await squareResponse.json();
+
+    if (!squareResponse.ok) {
+      console.error("Square API Error:", squareResult);
+
+      return new Response(
+        JSON.stringify({
+          error: "Failed to sync with Square",
+          details: squareResult,
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    // Extract Square's customer ID from the response
+    const squareCustomerId = squareResult.customer?.id;
+
+    if (squareCustomerId) {
+      // Initialize Supabase Admin Client
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      );
+
+      const { error: updateError } = await supabaseAdmin
+        .from("customers")
+        .update({
+          square_customer_id: squareCustomerId,
+        })
+        .eq("id", record.id);
+
+      if (updateError) {
+        console.error(
+          "Failed to update Square Customer ID in Supabase:",
+          updateError
+        );
+
+        return new Response(
+          JSON.stringify({
+            error: "Square customer created but database update failed",
+            details: updateError.message,
+            square_customer_id: squareCustomerId,
+          }),
+          {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        square_customer_id: squareCustomerId,
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  } catch (err) {
+    console.error("Edge function error:", err);
+
+    return new Response(
+      JSON.stringify({
+        error: err instanceof Error ? err.message : String(err),
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+});
+</file>
+
+<file path="script.js">
+// Ensure Supabase client is initialized at the top of script.js
+const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("registration-form");
+  const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+  const message = document.getElementById("message");
+  const welcomeName = document.getElementById("welcome-name");
+  const displayMemberId = document.getElementById("display-member-id");
+  const qrCodeContainer = document.getElementById("qrcode");
+  const successCard = document.getElementById("success-card");
+  const birthdayInput = document.getElementById("birthday");
+  const phoneInput = document.getElementById("phone");
+
+  // Helper function to capitalize names (handles hyphenated names too)
+  const capitalizeName = (str) => {
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map(word => word.split("-").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join("-"))
+      .join(" ");
+  };
+
+  if (phoneInput) {
+    // Ensure it starts with +509 if empty on load
+    if (!phoneInput.value.trim()) {
+      phoneInput.value = "+509 ";
+    }
+
+    // If they clear the field entirely, bring back the default prefix
+    phoneInput.addEventListener("blur", () => {
+      if (!phoneInput.value.trim() || phoneInput.value.trim() === "+") {
+        phoneInput.value = "+509 ";
+      }
+    });
+  }
+
+  // Optional: Auto-format birthday input as DD/MM while typing
+  if (birthdayInput) {
+    birthdayInput.addEventListener("input", (e) => {
+      let value = e.target.value.replace(/\D/g, ""); // Remove non-digits
+      if (value.length > 4) value = value.slice(0, 4); // Max 4 digits (DDMM)
+      if (value.length >= 3) {
+        value = value.slice(0, 2) + "/" + value.slice(2);
+      }
+      e.target.value = value;
+    });
+  }
+
+  if (form && submitBtn) {
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+
+      if (submitBtn.disabled) return;
+      submitBtn.disabled = true;
+      if (message) message.textContent = "Inscription en cours...";
+
+      const firstName = capitalizeName(document.getElementById("first-name").value.trim());
+      const lastName = capitalizeName(document.getElementById("last-name").value.trim());
+      const phone = document.getElementById("phone").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const birthday = birthdayInput ? birthdayInput.value.trim() : "";
+
+      // Generate a friendly reference ID: firstname-6digits (e.g., jean-482910)
+      const randomDigits = Math.floor(100000 + Math.random() * 900000);
+      const cleanFirstName = firstName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z]/g, "");
+      const referenceId = `${cleanFirstName || "client"}-${randomDigits}`;
+
+      // 1. Save to Supabase
+      const { data, error } = await supabaseClient
+        .from("customers")
+        .insert({
+          first_name: firstName,
+          last_name: lastName,
+          phone: phone,
+          email: email || null,
+          birthday: birthday || null, // Saved as "DD/MM" string
+          dressup_member_id: referenceId // Passwordless reference ID
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error(error);
+        if (message) message.textContent = "Une erreur est survenue lors de l'inscription.";
+        submitBtn.disabled = false;
+        return;
+      }
+
+      // 2. Call the Square Edge Function directly using CONFIG key
+      try {
+        const squareSyncRes = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/sync-square`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ record: data })
+        });
+
+        const squareResult = await squareSyncRes.json();
+        if (!squareSyncRes.ok) {
+          console.error("Erreur de synchronisation Square:", squareResult);
+        } else {
+          console.log("Client synchronisé avec succès sur Square !", squareResult);
+        }
+      } catch (err) {
+        console.error("Erreur réseau Edge Function:", err);
+      }
+
+      if (message) message.textContent = "";
+
+      // Populate UI & QR Code
+      if (welcomeName) welcomeName.textContent = data.first_name;
+      if (displayMemberId) displayMemberId.textContent = data.dressup_member_id;
+
+      if (qrCodeContainer) {
+        qrCodeContainer.innerHTML = "";
+        new QRCode(qrCodeContainer, {
+          text: data.dressup_member_id,
+          width: 180,
+          height: 180,
+          colorDark: "#136f9a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }
+
+      form.classList.add("hidden");
+      if (successCard) successCard.classList.remove("hidden");
+      form.reset();
+      submitBtn.disabled = false;
+    });
+  }
+});
+</file>
+
+<file path="index.html">
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DressupHT - Programme de Fidélité</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase & QR Code Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>DressupHT</h1>
+      <p>Inscrivez-vous à notre programme de fidélité pour profiter de nos avantages exclusifs !</p>
+      
+      <!-- Quick navigation button to check rewards without refilling the form -->
+      <div style="margin-top: 15px;">
+        <a href="rewards.html" class="btn-secondary" style="display: inline-block; padding: 10px 20px; background-color: #136f9a; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+          Voir progression
+        </a>
+      </div>
+    </header>
+
+    <!-- Registration Form -->
+    <form id="registration-form">
+      <div class="form-group">
+        <label for="first-name">Prénom</label>
+        <input type="text" id="first-name" name="first_name" placeholder="Votre prénom" required>
+      </div>
+
+      <div class="form-group">
+        <label for="last-name">Nom</label>
+        <input type="text" id="last-name" name="last_name" placeholder="Votre nom" required>
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Téléphone</label>
+        <input type="tel" id="phone" name="phone" value="+509 " placeholder="+509 XXXX XXXX" required>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email (optionnel)</label>
+        <input type="email" id="email" name="email" placeholder="votre@email.com">
+      </div>
+
+      <div class="form-group">
+        <label for="birthday">Date de naissance (JJ/MM)</label>
+        <input type="text" id="birthday" name="birthday" placeholder="JJ/MM" maxlength="5">
+      </div>
+
+      <button type="submit">S'inscrire</button>
+      <p id="message" style="margin-top: 10px;"></p>
+    </form>
+
+    <!-- Success Card (Hidden by default) -->
+    <div id="success-card" class="hidden">
+      <div class="card">
+        <h2>Bienvenue dans le club, <span id="welcome-name"></span> !</h2>
+        <p>Votre ID de membre unique :</p>
+        <div id="display-member-id" style="font-size: 1.3rem; font-weight: bold; color: #136f9a; margin: 10px 0;"></div>
+        <p style="font-size: 0.9rem; color: #666;">Conservez cet identifiant et votre date de naissance pour consulter vos points à tout moment.</p>
+        
+        <div id="qrcode" style="display: flex; justify-content: center; margin: 20px 0;"></div>
+        
+        <a href="rewards.html" style="display: inline-block; margin-top: 10px; color: #136f9a; text-decoration: underline;">Voir mes récompenses</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+</html>
+</file>
+
+</files>
