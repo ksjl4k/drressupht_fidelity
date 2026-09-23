@@ -25,29 +25,78 @@ document.addEventListener("DOMContentLoaded", () => {
     const refId = document.getElementById("ref-id").value.trim().toLowerCase();
     const birthday = birthdayInput.value.trim();
 
-    // Query Supabase for matching ID and Birthday
-    const { data, error } = await supabaseClient
+    // 1. Query Supabase for matching ID and Birthday
+    const { data: customer, error } = await supabaseClient
       .from("customers")
       .select("*")
       .eq("dressup_member_id", refId)
       .eq("birthday", birthday)
       .single();
 
-    if (error || !data) {
+    if (error || !customer) {
       errorMsg.textContent = "Identifiant ou date de naissance incorrect.";
       return;
     }
 
+    // 2. Fetch purchases for this customer
+    const { data: purchases, error: purError } = await supabaseClient
+      .from("purchases")
+      .select("*")
+      .eq("customer_id", customer.id)
+      .order("created_at", { ascending: false });
+
+    if (purError) {
+      console.error("Erreur lors de la récupération des achats:", purError);
+    }
+
     // Populate Dashboard Data
-    document.getElementById("dash-name").textContent = data.first_name;
-    document.getElementById("dash-id").textContent = data.dressup_member_id;
-    document.getElementById("dash-points").textContent = data.points || 0; // Assuming you have a points column, or defaults to 0
+    document.getElementById("dash-name").textContent = customer.first_name;
+    document.getElementById("dash-id").textContent = customer.dressup_member_id;
+    
+    // Calculate total points (e.g., 1 point per currency unit spent, or default to 0)
+    const totalSpent = purchases ? purchases.reduce((sum, p) => sum + Number(p.total_amount), 0) : 0;
+    document.getElementById("dash-points").textContent = Math.floor(totalSpent); // 1 point per HTG spent (adjust if needed)
+
+    // Render Purchases History List
+    const purchasesListContainer = document.getElementById("purchases-list");
+    if (purchasesListContainer) {
+      purchasesListContainer.innerHTML = "";
+
+      if (!purchases || purchases.length === 0) {
+        purchasesListContainer.innerHTML = `<p style="font-size: 13px; color: #666; text-align: center; margin-top: 10px;">Aucun achat récent enregistré.</p>`;
+      } else {
+        purchases.forEach(pur => {
+          const dateStr = new Date(pur.created_at).toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+          });
+
+          // Build items description
+          let itemsText = "Articles divers";
+          if (pur.items && Array.isArray(pur.items) && pur.items.length > 0) {
+            itemsText = pur.items.map(i => `${i.quantity || 1}x ${i.name}`).join(", ");
+          }
+
+          const purchaseCard = document.createElement("div");
+          purchaseCard.style.cssText = "background: #ffffff; border: 1px solid #e1ded8; padding: 12px; border-radius: 6px; margin-bottom: 10px; text-align: left;";
+          purchaseCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px;">
+              <span>${dateStr}</span>
+              <strong style="color: #136f9a;">${pur.total_amount} ${pur.currency || 'HTG'}</strong>
+            </div>
+            <div style="font-size: 13px; color: #2c3e50; font-weight: 500;">${itemsText}</div>
+          `;
+          purchasesListContainer.appendChild(purchaseCard);
+        });
+      }
+    }
 
     // Render QR Code
     const qrContainer = document.getElementById("qrcode");
     qrContainer.innerHTML = "";
     new QRCode(qrContainer, {
-      text: data.dressup_member_id,
+      text: customer.dressup_member_id,
       width: 180,
       height: 180,
       colorDark: "#136f9a",
