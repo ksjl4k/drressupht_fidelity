@@ -9,39 +9,58 @@ serve(async (req) => {
   try {
     const payload = await req.json();
     
-    // Check if the webhook event is related to a completed order
     const eventType = payload.type;
     if (eventType !== "order.updated" && eventType !== "order.created") {
       return new Response(JSON.stringify({ message: "Event ignored" }), { status: 200 });
     }
 
-    const orderData = payload.data?.object?.order_updated || payload.data?.object?.order;
-    if (!orderData) {
-      return new Response(JSON.stringify({ message: "No order data found" }), { status: 200 });
+    // Extract the order ID from the webhook event
+    const squareOrderId =
+        payload.data?.object?.order_updated?.order_id ||
+        payload.data?.object?.order?.id;
+
+    if (!squareOrderId) {
+      return new Response(JSON.stringify({ message: "No order ID found in webhook" }), { status: 200 });
     }
 
-    // Only process completed orders
-    if (orderData.state !== "COMPLETED") {
-      return new Response(JSON.stringify({ message: "Order not completed yet" }), { status: 200 });
+    const SQUARE_ACCESS_TOKEN = Deno.env.get("SQUARE_ACCESS_TOKEN");
+    const SQUARE_ENVIRONMENT = Deno.env.get("SQUARE_ENVIRONMENT") || "production";
+    const squareBaseUrl = SQUARE_ENVIRONMENT === "production" 
+      ? "https://connect.squareup.com" 
+      : "https://connect.squareupsandbox.com";
+
+    // FETCH FULL ORDER DETAILS DIRECTLY FROM SQUARE API
+    const orderResponse = await fetch(`${squareBaseUrl}/v2/orders/${squareOrderId}`, {
+      method: "GET",
+      headers: {
+        "Square-Version": "2024-01-18",
+        "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`
+      }
+    });
+
+    const orderResult = await orderResponse.json();
+    const orderData = orderResult.order;
+
+    if (!orderData || orderData.state !== "COMPLETED") {
+      return new Response(JSON.stringify({ message: "Order not completed or not found" }), { status: 200 });
     }
 
-    const squareOrderId = orderData.id;
     const squareCustomerId = orderData.customer_id;
-    const totalAmount = orderData.total_money?.amount ? orderData.total_money.amount / 100 : 0; // Convert cents to currency
+    const totalAmount = orderData.total_money?.amount ? orderData.total_money.amount / 100 : 0;
     const currency = orderData.total_money?.currency || "HTG";
     const lineItems = orderData.line_items || [];
 
     if (!squareCustomerId) {
+      console.log("Order completed without an attached loyalty customer ID:", squareOrderId);
       return new Response(JSON.stringify({ message: "Order has no associated customer" }), { status: 200 });
     }
 
-    // Initialize Supabase Admin Client
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // 1. Find the customer in Supabase using their square_customer_id
+    // Find the customer in Supabase
     const { data: customer, error: custError } = await supabaseAdmin
       .from("customers")
       .select("id")
@@ -49,11 +68,11 @@ serve(async (req) => {
       .single();
 
     if (custError || !customer) {
-      console.error("Customer not found in Supabase for Square ID:", squareCustomerId);
-      return new Response(JSON.stringify({ message: "Customer mapping not found" }), { status: 404 });
+      console.error("Customer mapping not found for Square Customer ID:", squareCustomerId);
+      return new Response(JSON.stringify({ message: "Customer mapping not found in database" }), { status: 404 });
     }
 
-    // 2. Insert the purchase record
+    // Insert purchase record
     const { error: insertError } = await supabaseAdmin
       .from("purchases")
       .upsert({
