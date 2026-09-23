@@ -11,6 +11,7 @@ body {
   background: #f8f6f2;
   color: #2c3e50;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
@@ -107,6 +108,29 @@ button:hover, .btn:hover {
   background: #d4d0c7;
 }
 
+.btn-secondary {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #136f9a;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+}
+
+.btn-secondary:hover {
+  opacity: 0.9;
+}
+
+.footer-note {
+  margin-top: 30px;
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+}
+
 .hidden {
   display: none !important;
 }
@@ -188,6 +212,7 @@ button:hover, .btn:hover {
     border-top: 1px solid #eaeaea;
     color: #666;
     font-size: 14px;
+    width: 100%;
 }
 
 .footer-links {
@@ -195,7 +220,7 @@ button:hover, .btn:hover {
 }
 
 .footer-links a, .site-footer a {
-    color: #007bff;
+    color: #136f9a;
     text-decoration: none;
     margin: 0 5px;
 }

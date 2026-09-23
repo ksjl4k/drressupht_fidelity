@@ -6,6 +6,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMsg = document.getElementById("error-message");
   const birthdayInput = document.getElementById("check-birthday");
 
+  // Validate birthday as a real DD/MM date
+  const isValidBirthday = (value) => {
+    const match = value.match(/^(\d{2})\/(\d{2})$/);
+    if (!match) return false;
+    const dd = parseInt(match[1], 10);
+    const mm = parseInt(match[2], 10);
+    if (mm < 1 || mm > 12) return false;
+    const daysInMonth = new Date(2000, mm, 0).getDate();
+    return dd >= 1 && dd <= daysInMonth;
+  };
+
   // Auto-format birthday input as DD/MM
   if (birthdayInput) {
     birthdayInput.addEventListener("input", (e) => {
@@ -24,6 +35,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const refId = document.getElementById("ref-id").value.trim().toLowerCase();
     const birthday = birthdayInput.value.trim();
+
+    if (!isValidBirthday(birthday)) {
+      errorMsg.textContent = "Date de naissance invalide (format JJ/MM).";
+      return;
+    }
 
     // 1. Query Supabase for matching ID and Birthday
     const { data: customer, error } = await supabaseClient

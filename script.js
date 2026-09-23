@@ -35,6 +35,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Validate phone: must start with +509 and contain 8 digits
+  const isValidPhone = (value) => /^\+509\d{8}$/.test(value.replace(/\s/g, ""));
+
+  // Validate birthday as a real DD/MM date
+  const isValidBirthday = (value) => {
+    const match = value.match(/^(\d{2})\/(\d{2})$/);
+    if (!match) return false;
+    const dd = parseInt(match[1], 10);
+    const mm = parseInt(match[2], 10);
+    if (mm < 1 || mm > 12) return false;
+    const daysInMonth = new Date(2000, mm, 0).getDate();
+    return dd >= 1 && dd <= daysInMonth;
+  };
+
   // Optional: Auto-format birthday input as DD/MM while typing
   if (birthdayInput) {
     birthdayInput.addEventListener("input", (e) => {
@@ -60,6 +74,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const phone = document.getElementById("phone").value.trim();
       const email = document.getElementById("email").value.trim();
       const birthday = birthdayInput ? birthdayInput.value.trim() : "";
+
+      if (!isValidPhone(phone)) {
+        if (message) message.textContent = "Veuillez entrer un numéro valide au format +509 XXXX XXXX.";
+        submitBtn.disabled = false;
+        return;
+      }
+
+      if (birthday && !isValidBirthday(birthday)) {
+        if (message) message.textContent = "Veuillez entrer une date de naissance valide au format JJ/MM.";
+        submitBtn.disabled = false;
+        return;
+      }
 
       // Generate a friendly reference ID: firstname-6digits (e.g., jean-482910)
       const randomDigits = Math.floor(100000 + Math.random() * 900000);
