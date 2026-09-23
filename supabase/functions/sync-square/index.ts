@@ -1,24 +1,57 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 serve(async (req) => {
+  // Handle browser CORS preflight request
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
+  // Only allow POST requests
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: corsHeaders,
+    });
   }
 
   try {
     const { record } = await req.json();
+
     if (!record) {
-      return new Response(JSON.stringify({ error: "No customer record provided" }), { status: 400 });
+      return new Response(
+        JSON.stringify({
+          error: "No customer record provided",
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
 
     const SQUARE_ACCESS_TOKEN = Deno.env.get("SQUARE_ACCESS_TOKEN");
-    const SQUARE_ENVIRONMENT = Deno.env.get("SQUARE_ENVIRONMENT") || "sandbox"; // "production" or "sandbox"
-    
+    const SQUARE_ENVIRONMENT =
+      Deno.env.get("SQUARE_ENVIRONMENT") || "sandbox";
+
     // Choose correct Square API URL based on environment
-    const squareBaseUrl = SQUARE_ENVIRONMENT === "production" 
-      ? "https://connect.squareup.com" 
-      : "https://connect.squareupsandbox.com";
+    const squareBaseUrl =
+      SQUARE_ENVIRONMENT === "production"
+        ? "https://connect.squareup.com"
+        : "https://connect.squareupsandbox.com";
 
     // 1. Prepare Customer Data for Square API
     const squareCustomerData = {
@@ -28,53 +61,110 @@ serve(async (req) => {
       phone_number: record.phone || "",
       email_address: record.email || undefined,
       reference_id: record.dressup_member_id,
-      note: `DressupHT Loyalty Member ID: ${record.dressup_member_id}`
+      note: `DressupHT Loyalty Member ID: ${record.dressup_member_id}`,
     };
 
     // 2. Call Square API to create/sync customer
-    const squareResponse = await fetch(`${squareBaseUrl}/v2/customers`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Square-Version": "2024-01-18",
-        "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`
-      },
-      body: JSON.stringify(squareCustomerData)
-    });
+    const squareResponse = await fetch(
+      `${squareBaseUrl}/v2/customers`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Square-Version": "2024-01-18",
+          Authorization: `Bearer ${SQUARE_ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify(squareCustomerData),
+      }
+    );
 
     const squareResult = await squareResponse.json();
 
     if (!squareResponse.ok) {
       console.error("Square API Error:", squareResult);
-      return new Response(JSON.stringify({ error: "Failed to sync with Square", details: squareResult }), { 
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+
+      return new Response(
+        JSON.stringify({
+          error: "Failed to sync with Square",
+          details: squareResult,
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
 
     // Extract Square's customer ID from the response
     const squareCustomerId = squareResult.customer?.id;
 
     if (squareCustomerId) {
-      // Initialize Supabase Admin Client to update the record with square_customer_id
+      // Initialize Supabase Admin Client
       const supabaseAdmin = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
       );
 
-      await supabaseAdmin
+      const { error: updateError } = await supabaseAdmin
         .from("customers")
-        .update({ square_customer_id: squareCustomerId })
+        .update({
+          square_customer_id: squareCustomerId,
+        })
         .eq("id", record.id);
+
+      if (updateError) {
+        console.error(
+          "Failed to update Square Customer ID in Supabase:",
+          updateError
+        );
+
+        return new Response(
+          JSON.stringify({
+            error: "Square customer created but database update failed",
+            details: updateError.message,
+            square_customer_id: squareCustomerId,
+          }),
+          {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
     }
 
-    return new Response(JSON.stringify({ success: true, square_customer_id: squareCustomerId }), {
-      headers: { "Content-Type": "application/json" },
-      status: 200,
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        square_customer_id: squareCustomerId,
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
   } catch (err) {
     console.error("Edge function error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+
+    return new Response(
+      JSON.stringify({
+        error: err instanceof Error ? err.message : String(err),
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 });
