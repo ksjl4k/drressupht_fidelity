@@ -180,3 +180,26 @@ button:hover, .btn:hover {
   margin-top: 10px;
   text-align: center;
 }
+
+.site-footer {
+    text-align: center;
+    padding: 20px 0;
+    margin-top: 40px;
+    border-top: 1px solid #eaeaea;
+    color: #666;
+    font-size: 14px;
+}
+
+.footer-links {
+    margin: 10px 0;
+}
+
+.footer-links a, .site-footer a {
+    color: #007bff;
+    text-decoration: none;
+    margin: 0 5px;
+}
+
+.footer-links a:hover, .site-footer a:hover {
+    text-decoration: underline;
+}
