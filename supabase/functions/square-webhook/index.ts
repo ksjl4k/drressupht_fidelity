@@ -11,9 +11,15 @@ function getSquareBaseUrl() {
     : "https://connect.squareupsandbox.com";
 }
 
-function generateDressupMemberId() {
-  const randomNumber = Math.floor(10000000 + Math.random() * 90000000);
-  return `DUH-${randomNumber}`;
+function generateDressupMemberId(firstName: string): string {
+  const cleanFirstName = firstName
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+  const randomNumber = Math.floor(100000 + Math.random() * 900000);
+
+  return `${cleanFirstName}-${randomNumber}`;
 }
 
 serve(async (req) => {
@@ -83,10 +89,10 @@ serve(async (req) => {
       }
 
       // Reuse the existing DressupHT ID if this webhook is retried.
-      let dressupMemberId =
+      const dressupMemberId =
         existingCustomer?.dressup_member_id ||
         squareCustomer.reference_id ||
-        generateDressupMemberId();
+        generateDressupMemberId(squareCustomer.given_name || "customer");
 
       // Save the customer in Supabase.
       const { error: customerError } = await supabaseAdmin
