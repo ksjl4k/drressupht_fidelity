@@ -1,3 +1,6 @@
+// Ensure Supabase client is initialized at the top of script.js
+const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("registration-form");
   const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
