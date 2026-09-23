@@ -6,6 +6,44 @@ document.addEventListener("DOMContentLoaded", () => {
   const displayMemberId = document.getElementById("display-member-id");
   const qrCodeContainer = document.getElementById("qrcode");
   const successCard = document.getElementById("success-card");
+  const birthdayInput = document.getElementById("birthday");
+
+  // Helper function to capitalize names (handles hyphenated names too)
+  const capitalizeName = (str) => {
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map(word => word.split("-").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join("-"))
+      .join(" ");
+  };
+
+  const phoneInput = document.getElementById("phone");
+
+  if (phoneInput) {
+    // Ensure it starts with +509 if empty on load
+    if (!phoneInput.value.trim()) {
+      phoneInput.value = "+509 ";
+    }
+
+    // If they clear the field entirely, bring back the default prefix
+    phoneInput.addEventListener("blur", () => {
+      if (!phoneInput.value.trim() || phoneInput.value.trim() === "+") {
+        phoneInput.value = "+509 ";
+      }
+    });
+  }
+
+  // Optional: Auto-format birthday input as DD/MM while typing
+  if (birthdayInput) {
+    birthdayInput.addEventListener("input", (e) => {
+      let value = e.target.value.replace(/\D/g, ""); // Remove non-digits
+      if (value.length > 4) value = value.slice(0, 4); // Max 4 digits (DDMM)
+      if (value.length >= 3) {
+        value = value.slice(0, 2) + "/" + value.slice(2);
+      }
+      e.target.value = value;
+    });
+  }
 
   if (form && submitBtn) {
     form.addEventListener("submit", async function (event) {
@@ -15,11 +53,11 @@ document.addEventListener("DOMContentLoaded", () => {
       submitBtn.disabled = true;
       if (message) message.textContent = "Inscription en cours...";
 
-      const firstName = document.getElementById("first-name").value.trim();
-      const lastName = document.getElementById("last-name").value.trim();
+      const firstName = capitalizeName(document.getElementById("first-name").value.trim());
+      const lastName = capitalizeName(document.getElementById("last-name").value.trim());
       const phone = document.getElementById("phone").value.trim();
       const email = document.getElementById("email").value.trim();
-      const birthday = document.getElementById("birthday").value.trim();
+      const birthday = birthdayInput ? birthdayInput.value.trim() : "";
 
       // 1. Save to Supabase
       const { data, error } = await supabaseClient
@@ -29,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
           last_name: lastName,
           phone: phone,
           email: email || null,
-          birthday: birthday || null
+          birthday: birthday || null // Will save as "DD/MM" string
         })
         .select()
         .single();
