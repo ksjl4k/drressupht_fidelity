@@ -79,18 +79,18 @@ serve(async (req) => {
     // ---------------------------------------------------------
 
     if (eventType === "customer.created") {
-      const squareCustomer =
-        payload.data?.object?.customer;
+      const squareCustomer = payload.data?.object?.customer;
 
       if (!squareCustomer) {
         return new Response(
           JSON.stringify({ message: "No customer found in webhook" }),
-          {
-            headers: { "Content-Type": "application/json" },
-            status: 200,
-          }
+          { headers: { "Content-Type": "application/json" }, status: 200 }
         );
       }
+
+      // DEBUG: Log the raw customer object and birthday from Square
+      console.log("SQUARE RAW CUSTOMER OBJECT:", JSON.stringify(squareCustomer));
+      console.log("SQUARE RAW BIRTHDAY:", squareCustomer.birthday);
 
       const squareCustomerId = squareCustomer.id;
 
