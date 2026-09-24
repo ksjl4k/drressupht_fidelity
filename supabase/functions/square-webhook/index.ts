@@ -96,34 +96,66 @@ serve(async (req) => {
         );
       }
 
-      // Check whether this Square customer already exists.
-      const { data: existingCustomer, error: existingError } =
+      // Check whether this Square customer is already linked in Supabase.
+      const { data: linkedCustomer, error: linkedError } =
         await supabaseAdmin
           .from("customers")
-          .select("id, dressup_member_id")
+          .select("id, dressup_member_id, birthday")
           .eq("square_customer_id", squareCustomerId)
           .maybeSingle();
 
-      if (existingError) {
+      if (linkedError) {
         throw new Error(
-          `Error checking existing customer: ${existingError.message}`
+          `Error checking linked customer: ${linkedError.message}`
         );
       }
+
+      // If not linked yet, the webhook may have raced the loyalty
+      // registration: the app already created the row with this member ID.
+      // Match on the DressupHT member ID to avoid duplicate rows.
+      const candidateMemberId = squareCustomer.reference_id || null;
+      let customerByMemberId = null;
+
+      if (!linkedCustomer && candidateMemberId) {
+        const { data: memberMatch, error: memberError } =
+          await supabaseAdmin
+            .from("customers")
+            .select("id, dressup_member_id, birthday")
+            .eq("dressup_member_id", candidateMemberId)
+            .limit(1)
+            .maybeSingle();
+
+        if (memberError) {
+          throw new Error(
+            `Error checking customer by member ID: ${memberError.message}`
+          );
+        }
+
+        customerByMemberId = memberMatch;
+      }
+
+      const existingCustomer = linkedCustomer || customerByMemberId;
 
       // Reuse the existing DressupHT ID if this webhook is retried.
       const dressupMemberId =
         existingCustomer?.dressup_member_id ||
-        squareCustomer.reference_id ||
+        candidateMemberId ||
         generateDressupMemberId(squareCustomer.given_name || "customer");
 
-      // Convert birthday from YYYY-MM-DD to JJ/MM
-      const formattedBirthday = formatBirthdayToJJMM(squareCustomer.birthday);
+      // Convert birthday from YYYY-MM-DD to JJ/MM and keep the existing
+      // value when Square has no birthday for this customer.
+      const formattedBirthday =
+        formatBirthdayToJJMM(squareCustomer.birthday) ||
+        existingCustomer?.birthday ||
+        null;
 
-      // Save the customer in Supabase.
-      const { error: customerError } = await supabaseAdmin
-        .from("customers")
-        .upsert(
-          {
+      if (existingCustomer) {
+        // Link only when this row is unlinked or already points at this same
+        // Square customer. Concurrent customer.created events must not replace
+        // the first successful link with a different Square ID.
+        const { data: updatedCustomer, error: customerError } = await supabaseAdmin
+          .from("customers")
+          .update({
             dressup_member_id: dressupMemberId,
             first_name: squareCustomer.given_name || "Unknown",
             last_name: squareCustomer.family_name || "Unknown",
@@ -131,16 +163,62 @@ serve(async (req) => {
             phone: squareCustomer.phone_number || "UNKNOWN",
             birthday: formattedBirthday,
             square_customer_id: squareCustomerId,
-          },
-          {
-            onConflict: "square_customer_id",
-          }
-        );
+            square_sync_status: "completed",
+            square_sync_claim_token: null,
+            square_sync_lease_until: null,
+          })
+          .eq("id", existingCustomer.id)
+          .or(`square_customer_id.is.null,square_customer_id.eq.${squareCustomerId}`)
+          .select("id, square_customer_id")
+          .maybeSingle();
 
-      if (customerError) {
-        throw new Error(
-          `Error saving customer to Supabase: ${customerError.message}`
-        );
+        if (customerError) {
+          throw new Error(
+            `Error updating customer in Supabase: ${customerError.message}`
+          );
+        }
+
+        if (!updatedCustomer) {
+          console.error(
+            "Square customer link conflict; preserving the existing link:",
+            existingCustomer.id,
+            squareCustomerId
+          );
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              conflict: true,
+              message: "Customer is already linked to a different Square profile",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+              status: 200,
+            }
+          );
+        }
+      } else {
+        // New customer coming from Square (e.g. created by a cashier in PoS).
+        const { error: customerError } = await supabaseAdmin
+          .from("customers")
+          .insert({
+            dressup_member_id: dressupMemberId,
+            first_name: squareCustomer.given_name || "Unknown",
+            last_name: squareCustomer.family_name || "Unknown",
+            email: squareCustomer.email_address || null,
+            phone: squareCustomer.phone_number || "UNKNOWN",
+            birthday: formattedBirthday,
+            square_customer_id: squareCustomerId,
+            square_sync_status: "completed",
+            square_sync_claim_token: null,
+            square_sync_lease_until: null,
+          });
+
+        if (customerError) {
+          throw new Error(
+            `Error saving customer to Supabase: ${customerError.message}`
+          );
+        }
       }
 
       // If Square did not already have a DressupHT reference ID,
