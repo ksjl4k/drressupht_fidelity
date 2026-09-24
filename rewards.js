@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
   
   const loginForm = document.getElementById("rewards-login-form");
@@ -29,29 +29,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    errorMsg.textContent = "";
-
-    const refId = document.getElementById("ref-id").value.trim().toLowerCase();
-    const birthday = birthdayInput.value.trim();
-
-    if (!isValidBirthday(birthday)) {
-      errorMsg.textContent = "Date de naissance invalide (format JJ/MM).";
-      return;
-    }
-
+  const loadCustomerDashboard = async (referenceId, birthday) => {
     // 1. Query Supabase for matching ID and Birthday
     const { data: customer, error } = await supabaseClient
       .from("customers")
       .select("*")
-      .eq("dressup_member_id", refId)
+      .eq("dressup_member_id", referenceId)
       .eq("birthday", birthday)
       .single();
 
     if (error || !customer) {
-      errorMsg.textContent = "Identifiant ou date de naissance incorrect.";
-      return;
+      return null;
     }
 
     // 2. Fetch purchases for this customer
@@ -123,12 +111,61 @@ document.addEventListener("DOMContentLoaded", () => {
     // Switch views
     loginForm.classList.add("hidden");
     dashboard.classList.remove("hidden");
+
+    return customer;
+  };
+
+  const storedSession = localStorage.getItem("dressupht_session");
+  if (storedSession) {
+    try {
+      const session = JSON.parse(storedSession);
+      if (session && typeof session.id === "string" && typeof session.birthday === "string") {
+        const restored = await loadCustomerDashboard(
+          session.id.trim().toLowerCase(),
+          session.birthday.trim()
+        );
+
+        if (!restored) {
+          localStorage.removeItem("dressupht_session");
+        }
+      } else {
+        localStorage.removeItem("dressupht_session");
+      }
+    } catch (err) {
+      localStorage.removeItem("dressupht_session");
+    }
+  }
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorMsg.textContent = "";
+
+    const refId = document.getElementById("ref-id").value.trim().toLowerCase();
+    const birthday = birthdayInput.value.trim();
+
+    if (!isValidBirthday(birthday)) {
+      errorMsg.textContent = "Date de naissance invalide (format JJ/MM).";
+      return;
+    }
+
+    const customer = await loadCustomerDashboard(refId, birthday);
+
+    if (!customer) {
+      errorMsg.textContent = "Identifiant ou date de naissance incorrect.";
+      return;
+    }
+
+    localStorage.setItem(
+      "dressupht_session",
+      JSON.stringify({ id: refId, birthday })
+    );
   });
 
   // Logout / Reset view
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("dressupht_session");
       dashboard.classList.add("hidden");
       loginForm.classList.remove("hidden");
       loginForm.reset();
