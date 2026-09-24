@@ -69,6 +69,18 @@
           <span id="dash-points" style="font-size: 2rem; font-weight: bold; color: #136f9a;">0</span> pts
         </div>
 
+        <!-- Reward Progress Tracker (temporary: goal of 1000 points) -->
+        <div class="reward-progress">
+          <div class="progress-header">
+            <span class="progress-title">Progression vers la récompense</span>
+            <span class="progress-pct" id="progress-pct">0 %</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <p class="progress-status" id="progress-status">Plus que 1000 pts pour débloquer votre récompense.</p>
+        </div>
+
         <div class="qr-section">
           <button type="button" id="qr-toggle-btn" class="secondary-btn">Afficher mon QR code</button>
           <div id="qrcode" class="hidden"></div>
@@ -76,8 +88,8 @@
 
         <!-- Purchase History Section -->
         <div style="margin-top: 20px; text-align: left;">
-          <h3 style="font-size: 15px; margin-bottom: 10px; color: #2c3e50;">Historique des achats</h3>
-          <div id="purchases-list">
+          <button type="button" id="history-toggle-btn" class="secondary-btn">Afficher l'historique des achats</button>
+          <div id="purchases-list" class="purchases-scroll hidden">
             <!-- Dynamically populated purchases go here -->
           </div>
         </div>

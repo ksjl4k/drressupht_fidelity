@@ -73,6 +73,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     const totalSpent = purchases ? purchases.reduce((sum, p) => sum + Number(p.total_amount), 0) : 0;
     document.getElementById("dash-points").textContent = Math.floor(totalSpent); // 1 point per HTG spent (adjust if needed)
 
+    // Update reward progress tracker (temporary: goal of 1000 points)
+    const REWARD_GOAL = 1000;
+    const totalPoints = Math.floor(totalSpent);
+    const progress = Math.min(totalPoints / REWARD_GOAL, 1);
+    document.getElementById("progress-fill").style.width = `${Math.round(progress * 100)}%`;
+    document.getElementById("progress-pct").textContent = `${Math.round(progress * 100)} %`;
+
+    const progressStatus = document.getElementById("progress-status");
+    if (totalPoints >= REWARD_GOAL) {
+      progressStatus.textContent = "Récompense débloquée, félicitations !";
+    } else {
+      progressStatus.textContent = `Plus que ${REWARD_GOAL - totalPoints} pts pour débloquer votre récompense.`;
+    }
+
     // Render Purchases History List
     const purchasesListContainer = document.getElementById("purchases-list");
     if (purchasesListContainer) {
@@ -185,6 +199,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  const historyToggleBtn = document.getElementById("history-toggle-btn");
+  if (historyToggleBtn) {
+    historyToggleBtn.addEventListener("click", () => {
+      const showing = document.getElementById("purchases-list").classList.toggle("hidden") === false;
+      historyToggleBtn.textContent = showing
+        ? "Masquer l'historique des achats"
+        : "Afficher l'historique des achats";
+    });
+  }
+
   // Logout / Reset view
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
@@ -192,11 +216,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       localStorage.removeItem("dressupht_session");
       qrGenerated = false;
       qrMemberId = "";
+
       if (qrContainer) {
         qrContainer.classList.add("hidden");
         qrContainer.innerHTML = "";
       }
       qrToggleBtn.textContent = "Afficher mon QR code";
+      const purchasesList = document.getElementById("purchases-list");
+      if (purchasesList) {
+        purchasesList.classList.add("hidden");
+      }
+      historyToggleBtn.textContent = "Afficher l'historique des achats";
       dashboard.classList.add("hidden");
       loginForm.classList.remove("hidden");
       loginForm.reset();
