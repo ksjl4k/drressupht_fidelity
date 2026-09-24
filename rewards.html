@@ -42,6 +42,24 @@
 
     <!-- Success View (Hidden by default) -->
     <div id="rewards-dashboard" class="hidden">
+      <!-- Membership Card -->
+      <div class="membership-card">
+        <div class="membership-card-top">
+          <span class="membership-logo">DRESSUPHT</span>
+          <div class="membership-since">
+            <span class="membership-label">MEMBRE DEPUIS</span>
+            <span id="membership-since"></span>
+          </div>
+        </div>
+        <div class="membership-card-bottom">
+          <span class="membership-name" id="membership-card-name"></span>
+          <div class="membership-id-block">
+            <span class="membership-label">ID MEMBRE</span>
+            <span class="membership-id" id="membership-card-id"></span>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Bienvenue, <span id="dash-name"></span> !</h2>
         <p style="margin-top: 5px;">ID: <strong id="dash-id"></strong></p>
@@ -51,7 +69,10 @@
           <span id="dash-points" style="font-size: 2rem; font-weight: bold; color: #136f9a;">0</span> pts
         </div>
 
-        <div id="qrcode"></div>
+        <div class="qr-section">
+          <button type="button" id="qr-toggle-btn" class="secondary-btn">Afficher mon QR code</button>
+          <div id="qrcode" class="hidden"></div>
+        </div>
 
         <!-- Purchase History Section -->
         <div style="margin-top: 20px; text-align: left;">

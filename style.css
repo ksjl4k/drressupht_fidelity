@@ -205,6 +205,92 @@ button:hover, .btn:hover {
   text-align: center;
 }
 
+/* Membership Card */
+.membership-card {
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 1.586 / 1;
+  margin: 0 auto 20px;
+  padding: 24px;
+  background: #0c2149;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: 18px;
+  box-shadow: 0 2px 6px rgba(10, 20, 45, 0.15);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.membership-card-top,
+.membership-card-bottom {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.membership-card-bottom {
+  align-items: flex-end;
+}
+
+.membership-logo {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #d4af37;
+}
+
+.membership-since,
+.membership-id-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  min-width: 0;
+}
+
+.membership-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: #d4af37;
+  opacity: 0.9;
+  margin-bottom: 3px;
+}
+
+.membership-since span:last-child,
+.membership-id {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: #e9d9a0;
+  overflow-wrap: anywhere;
+}
+
+.membership-name {
+  font-size: clamp(13px, 4vw, 17px);
+  font-weight: 600;
+  color: #f3e6bd;
+  letter-spacing: 0.3px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 380px) {
+  .membership-card {
+    padding: 18px;
+  }
+
+  .membership-logo {
+    font-size: 14px;
+    letter-spacing: 2px;
+  }
+
+  .membership-name {
+    font-size: 13px;
+  }
+}
+
 .site-footer {
     text-align: center;
     padding: 20px 0;
@@ -213,6 +299,71 @@ button:hover, .btn:hover {
     color: #666;
     font-size: 14px;
     width: 100%;
+}
+
+.page-back {
+  display: inline-block;
+  margin-bottom: 20px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: #136f9a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "Sora", sans-serif;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.page-back:hover {
+  opacity: 0.9;
+}
+
+/* Legal / policy pages */
+.legal-page h1 {
+  text-align: center;
+  font-size: 24px;
+  color: #2c3e50;
+  margin-bottom: 6px;
+}
+
+.legal-page .page-updated {
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 26px;
+}
+
+.legal-page h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #136f9a;
+  margin: 22px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #eee9e0;
+}
+
+.legal-page p {
+  line-height: 1.7;
+  margin-bottom: 10px;
+  color: #4a4a4a;
+}
+
+.legal-page ul,
+.legal-page ol {
+  margin: 10px 0 18px 20px;
+  padding: 0;
+}
+
+.legal-page li {
+  color: #555;
+  font-size: 13px;
+  line-height: 1.65;
+  margin-bottom: 7px;
+}
+
+.legal-page a {
+  color: #136f9a;
 }
 
 .footer-links {

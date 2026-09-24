@@ -5,6 +5,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dashboard = document.getElementById("rewards-dashboard");
   const errorMsg = document.getElementById("error-message");
   const birthdayInput = document.getElementById("check-birthday");
+  const qrToggleBtn = document.getElementById("qr-toggle-btn");
+  const qrContainer = document.getElementById("qrcode");
+  let qrGenerated = false;
+  let qrMemberId = "";
 
   // Validate birthday as a real DD/MM date
   const isValidBirthday = (value) => {
@@ -56,6 +60,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Populate Dashboard Data
     document.getElementById("dash-name").textContent = customer.first_name;
     document.getElementById("dash-id").textContent = customer.dressup_member_id;
+
+    // Populate Membership Card
+    document.getElementById("membership-card-name").textContent = `${customer.first_name} ${customer.last_name}`;
+    document.getElementById("membership-since").textContent = new Date(customer.created_at).toLocaleDateString("fr-FR", {
+      month: "short",
+      year: "numeric"
+    });
+    document.getElementById("membership-card-id").textContent = customer.dressup_member_id;
     
     // Calculate total points (e.g., 1 point per currency unit spent, or default to 0)
     const totalSpent = purchases ? purchases.reduce((sum, p) => sum + Number(p.total_amount), 0) : 0;
@@ -96,17 +108,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    // Render QR Code
-    const qrContainer = document.getElementById("qrcode");
-    qrContainer.innerHTML = "";
-    new QRCode(qrContainer, {
-      text: customer.dressup_member_id,
-      width: 180,
-      height: 180,
-      colorDark: "#136f9a",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.H
-    });
+    // Store member ID for on-demand QR code generation
+    qrMemberId = customer.dressup_member_id;
+    qrGenerated = false;
 
     // Switch views
     loginForm.classList.add("hidden");
@@ -161,11 +165,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   });
 
+  if (qrToggleBtn) {
+    qrToggleBtn.addEventListener("click", () => {
+      const showing = qrContainer.classList.toggle("hidden") === false;
+      qrToggleBtn.textContent = showing ? "Masquer mon QR code" : "Afficher mon QR code";
+
+      if (showing && !qrGenerated) {
+        qrContainer.innerHTML = "";
+        new QRCode(qrContainer, {
+          text: qrMemberId,
+          width: 180,
+          height: 180,
+          colorDark: "#136f9a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+        qrGenerated = true;
+      }
+    });
+  }
+
   // Logout / Reset view
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
       localStorage.removeItem("dressupht_session");
+      qrGenerated = false;
+      qrMemberId = "";
+      if (qrContainer) {
+        qrContainer.classList.add("hidden");
+        qrContainer.innerHTML = "";
+      }
+      qrToggleBtn.textContent = "Afficher mon QR code";
       dashboard.classList.add("hidden");
       loginForm.classList.remove("hidden");
       loginForm.reset();
