@@ -60,6 +60,27 @@
         </div>
       </div>
 
+      <!-- Reward progress + encouragement section (below the membership card) -->
+      <section class="reward-nudge" id="reward-nudge" aria-label="Progression vers votre prochaine récompense">
+        <span class="reward-nudge-badge">RÉCOMPENSE</span>
+
+        <div class="reward-nudge-head">
+          <span class="reward-nudge-label">Vos points</span>
+          <span class="reward-nudge-points" id="reward-nudge-points">0</span>
+          <span class="reward-nudge-pts-suffix">pts</span>
+          <span class="reward-nudge-goal" id="reward-nudge-goal">Objectif : —</span>
+        </div>
+
+        <div class="reward-nudge-track" id="reward-nudge-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="reward-nudge-fill" id="reward-nudge-fill"></div>
+        </div>
+
+        <p class="reward-nudge-status" id="reward-nudge-status"></p>
+        <p class="reward-nudge-message" id="reward-nudge-message">Vous vous rapprochez de votre prochaine récompense !</p>
+
+        <div class="reward-confetti" id="reward-confetti" aria-hidden="true"></div>
+      </section>
+
       <div class="card">
         <h2>Bienvenue, <span id="dash-name"></span> !</h2>
         <p style="margin-top: 5px;">ID: <strong id="dash-id"></strong></p>
@@ -67,18 +88,6 @@
         <div class="points-box">
           <p style="font-size: 0.9rem; margin: 0; color: #136f9a; font-weight: 600;">Solde de points :</p>
           <span id="dash-points" style="font-size: 2rem; font-weight: bold; color: #136f9a;">0</span> pts
-        </div>
-
-        <!-- Reward Progress Tracker (temporary: goal of 1000 points) -->
-        <div class="reward-progress">
-          <div class="progress-header">
-            <span class="progress-title">Progression vers la récompense</span>
-            <span class="progress-pct" id="progress-pct">0 %</span>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" id="progress-fill"></div>
-          </div>
-          <p class="progress-status" id="progress-status">Plus que 1000 pts pour débloquer votre récompense.</p>
         </div>
 
         <div class="qr-section">

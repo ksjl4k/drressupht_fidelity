@@ -33,6 +33,132 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Reward progress + encouragement (TEMPORARY loyalty rules).
+  // The target is randomized and kept per-member in sessionStorage so it stays
+  // stable for the session. This block is fully isolated so it can easily be
+  // swapped for the real DressupHT loyalty rules later.
+  // ---------------------------------------------------------------------------
+  const REWARD_RULES = {
+    minGoal: 500,
+    maxGoal: 2000,
+    nearlyThereRatio: 0.15,
+    storageKey: "dressupht_reward_goal"
+  };
+
+  const CONFETTI_COLORS = ["#d4af37", "#e9d9a0", "#3ea8d6", "#136f9a", "#ffffff"];
+  let confettiTimer = null;
+
+  const getRewardGoal = (memberId, totalPoints) => {
+    const { minGoal, maxGoal, storageKey } = REWARD_RULES;
+    const key = `${storageKey}:${memberId}`;
+    try {
+      const stored = parseInt(sessionStorage.getItem(key) || "", 10);
+      if (Number.isInteger(stored) && stored > totalPoints) return stored;
+    } catch (err) {
+      // storage unavailable — fall through to a fresh target
+    }
+    const goal = minGoal + Math.floor(Math.random() * (maxGoal - minGoal + 1));
+    const finalGoal = goal > totalPoints ? goal : totalPoints + minGoal;
+    try {
+      sessionStorage.setItem(key, String(finalGoal));
+    } catch (err) {
+      // storage unavailable — target still works for this load
+    }
+    return finalGoal;
+  };
+
+  const launchConfetti = (container, { excited = true } = {}) => {
+    if (!container) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    // Making sure a previous burst is fully cleaned up before starting a new one.
+    if (confettiTimer) {
+      clearTimeout(confettiTimer);
+      confettiTimer = null;
+    }
+
+    const fallDistance = (container.offsetHeight || 280) + 24;
+    const count = excited ? 32 : 20;
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement("span");
+      piece.className = "confetti-piece";
+      const size = 5 + Math.random() * 6;
+      piece.style.width = `${size}px`;
+      piece.style.height = `${size * (Math.random() > 0.5 ? 1 : 0.55)}px`;
+      piece.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+      piece.style.left = `${Math.random() * 100}%`;
+      piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+      piece.style.animationDelay = `${(Math.random() * 0.45).toFixed(2)}s`;
+      piece.style.animationDuration = `${(1.3 + Math.random() * 1.2).toFixed(2)}s`;
+      piece.style.setProperty("--fall", `${fallDistance}px`);
+      fragment.appendChild(piece);
+    }
+
+    container.innerHTML = "";
+    container.appendChild(fragment);
+
+    confettiTimer = setTimeout(() => {
+      container.innerHTML = "";
+      confettiTimer = null;
+    }, 2300);
+  };
+
+  const renderRewardProgress = (totalPoints, memberId) => {
+    const goal = getRewardGoal(memberId, totalPoints);
+    const remaining = Math.max(goal - totalPoints, 0);
+    const pct = Math.round(Math.min(totalPoints / goal, 1) * 100);
+
+    const pointsEl = document.getElementById("reward-nudge-points");
+    const goalEl = document.getElementById("reward-nudge-goal");
+    const statusEl = document.getElementById("reward-nudge-status");
+    const messageEl = document.getElementById("reward-nudge-message");
+    const fillEl = document.getElementById("reward-nudge-fill");
+    const trackEl = document.getElementById("reward-nudge-track");
+    const confettiEl = document.getElementById("reward-confetti");
+
+    if (pointsEl) pointsEl.textContent = totalPoints.toLocaleString("fr-FR");
+    if (goalEl) goalEl.textContent = `Objectif : ${goal.toLocaleString("fr-FR")} pts`;
+    if (fillEl) fillEl.style.width = `${pct}%`;
+    if (trackEl) trackEl.setAttribute("aria-valuenow", String(pct));
+
+    const unlocked = totalPoints >= goal;
+    const nearlyThere =
+      !unlocked &&
+      totalPoints > 0 &&
+      remaining <= Math.ceil(goal * REWARD_RULES.nearlyThereRatio);
+
+    if (messageEl) {
+      if (unlocked) {
+        messageEl.textContent = "Récompense débloquée, félicitations !";
+        messageEl.classList.remove("reward-nudge-message--excited");
+      } else if (nearlyThere) {
+        messageEl.textContent = "Presque là ! Encore un petit effort pour débloquer votre récompense !";
+        messageEl.classList.add("reward-nudge-message--excited");
+      } else {
+        messageEl.textContent = "Vous vous rapprochez de votre prochaine récompense !";
+        messageEl.classList.remove("reward-nudge-message--excited");
+      }
+    }
+
+    if (statusEl) {
+      statusEl.textContent = unlocked
+        ? "Vous avez atteint votre objectif, profitez de votre récompense !"
+        : `Plus que ${remaining.toLocaleString("fr-FR")} pts avant votre prochaine récompense.`;
+    }
+
+    const nudge = document.getElementById("reward-nudge");
+    if (nudge) {
+      nudge.classList.remove("reward-nudge--ready");
+      void nudge.offsetWidth;
+      nudge.classList.add("reward-nudge--ready");
+    }
+
+    launchConfetti(confettiEl, { excited: unlocked || nearlyThere });
+  };
+
   const loadCustomerDashboard = async (referenceId, birthday) => {
     // 1. Query Supabase for matching ID and Birthday
     const { data: customer, error } = await supabaseClient
@@ -73,20 +199,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const totalSpent = purchases ? purchases.reduce((sum, p) => sum + Number(p.total_amount), 0) : 0;
     document.getElementById("dash-points").textContent = Math.floor(totalSpent); // 1 point per HTG spent (adjust if needed)
 
-    // Update reward progress tracker (temporary: goal of 1000 points)
-    const REWARD_GOAL = 1000;
-    const totalPoints = Math.floor(totalSpent);
-    const progress = Math.min(totalPoints / REWARD_GOAL, 1);
-    document.getElementById("progress-fill").style.width = `${Math.round(progress * 100)}%`;
-    document.getElementById("progress-pct").textContent = `${Math.round(progress * 100)} %`;
-
-    const progressStatus = document.getElementById("progress-status");
-    if (totalPoints >= REWARD_GOAL) {
-      progressStatus.textContent = "Récompense débloquée, félicitations !";
-    } else {
-      progressStatus.textContent = `Plus que ${REWARD_GOAL - totalPoints} pts pour débloquer votre récompense.`;
-    }
-
     // Render Purchases History List
     const purchasesListContainer = document.getElementById("purchases-list");
     if (purchasesListContainer) {
@@ -126,9 +238,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     qrMemberId = customer.dressup_member_id;
     qrGenerated = false;
 
-    // Switch views
+    // Switch views (done before rendering progress so the confetti can measure
+    // the visible section)
     loginForm.classList.add("hidden");
     dashboard.classList.remove("hidden");
+
+    // Render reward progress + encouragement (runs once per dashboard load)
+    renderRewardProgress(Math.floor(totalSpent), customer.dressup_member_id);
 
     return customer;
   };

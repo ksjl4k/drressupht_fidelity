@@ -198,54 +198,203 @@ button:hover, .btn:hover {
   text-align: center;
 }
 
-.reward-progress {
-  margin: 15px 0;
-  padding: 15px;
-  background: #f0f8ff;
-  border-radius: 8px;
-  border: 1px solid #d0e7f9;
+/* Reward progress + encouragement section */
+.reward-nudge {
+  position: relative;
+  margin: 0 auto 20px;
+  padding: 18px 20px;
+  max-width: 440px;
+  background: linear-gradient(135deg, #0c2149, #12346b);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(10, 20, 45, 0.15);
+  color: #ffffff;
+  text-align: left;
+  overflow: hidden;
+  opacity: 0;
 }
 
-.progress-header {
+.reward-nudge--ready {
+  animation: reward-nudge-in 0.55s ease-out forwards;
+}
+
+.reward-nudge-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #0c2149;
+  background: #d4af37;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+
+.reward-nudge-head {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 8px;
   margin-bottom: 10px;
-  gap: 10px;
 }
 
-.progress-title {
+.reward-nudge-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #e9d9a0;
+  text-transform: uppercase;
+}
+
+.reward-nudge-points {
+  font-size: 26px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.reward-nudge-pts-suffix {
   font-size: 13px;
   font-weight: 600;
-  color: #136f9a;
+  color: #e9d9a0;
 }
 
-.progress-pct {
-  font-size: 13px;
-  font-weight: 700;
-  color: #136f9a;
+.reward-nudge-goal {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
 }
 
-.progress-track {
+.reward-nudge-track {
   height: 10px;
-  background: #e2dfd8;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(212, 175, 55, 0.35);
   border-radius: 999px;
   overflow: hidden;
 }
 
-.progress-fill {
+.reward-nudge-fill {
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, #136f9a, #3ea8d6);
+  background: linear-gradient(90deg, #d4af37, #f0d77b);
   border-radius: 999px;
-  box-shadow: 0 0 12px rgba(62, 168, 214, 0.55);
-  transition: width 0.4s ease;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
+  transition: width 0.6s ease;
 }
 
-.progress-status {
+.reward-nudge-status {
   margin-top: 9px;
   font-size: 12px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.reward-nudge-message {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #f3e6bd;
+  opacity: 0;
+}
+
+.reward-nudge--ready .reward-nudge-message {
+  animation: reward-message-in 0.6s ease-out 0.3s forwards;
+}
+
+.reward-nudge-message--excited {
+  color: #ffffff;
+  text-shadow: 0 0 14px rgba(212, 175, 55, 0.45);
+}
+
+.reward-nudge--ready .reward-nudge-message--excited {
+  animation-name: reward-message-excited;
+}
+
+/* Confetti */
+.reward-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -14px;
+  display: block;
+  opacity: 0;
+  will-change: transform;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.3, 0.5, 0.9, 1);
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+/* Keyframes */
+@keyframes reward-nudge-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reward-message-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes reward-message-excited {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(var(--fall, 300px)) rotate(720deg);
+  }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .reward-nudge,
+  .reward-nudge--ready {
+    opacity: 1;
+    animation: none;
+  }
+
+  .reward-nudge-message,
+  .reward-nudge--ready .reward-nudge-message,
+  .reward-nudge--ready .reward-nudge-message--excited {
+    opacity: 1;
+    animation: none;
+    transform: none;
+  }
+
+  .confetti-piece {
+    display: none;
+  }
 }
 
 .purchases-scroll {
