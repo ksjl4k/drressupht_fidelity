@@ -311,13 +311,17 @@ button:hover, .btn:hover {
   animation-name: reward-message-excited;
 }
 
-/* Confetti */
+/* Confetti: page-level layer covering the whole viewport, so the burst is
+   visible around every card and not clipped by .reward-nudge's overflow.
+   position: fixed + inset: 0 keeps it out of the scrollable overflow area
+   (no horizontal/vertical scrollbar) and pointer-events: none keeps every
+   button, link and QR code fully clickable underneath. */
 .reward-confetti {
-  position: absolute;
+  position: fixed;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 1;
+  z-index: 20;
 }
 
 .confetti-piece {
@@ -376,6 +380,61 @@ button:hover, .btn:hover {
   }
 }
 
+/* Mascot: standalone element between the membership card and the reward
+   progress card. It is never absolutely positioned, so it cannot overlap a
+   card, a button or the QR code, and the wiggle only animates transform,
+   which never reflows the surrounding layout. */
+.mascot-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 0 20px;
+}
+
+.mascot {
+  display: block;
+  width: 140px;
+  height: auto;
+  max-width: 100%;
+  transform-origin: 50% 100%;
+  animation: mascot-wiggle 2.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes mascot-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  25% {
+    transform: rotate(-3deg) translateY(-2px);
+  }
+  50% {
+    transform: rotate(0deg) translateY(0);
+  }
+  75% {
+    transform: rotate(3deg) translateY(-2px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .mascot {
+    width: 110px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mascot {
+    width: 80px;
+  }
+}
+
+@media (max-width: 375px) {
+  .mascot {
+    width: 65px;
+  }
+}
+
 /* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .reward-nudge,
@@ -394,6 +453,10 @@ button:hover, .btn:hover {
 
   .confetti-piece {
     display: none;
+  }
+
+  .mascot {
+    animation: none;
   }
 }
 
@@ -428,6 +491,25 @@ button:hover, .btn:hover {
   margin: 0 auto 20px;
   padding: 24px;
   background: #0c2149;
+  /* Photo de la boutique en fond de carte. Le voile navy (calques de
+     background-image) assombrit les zones haute et basse où vivent le logo,
+     le nom du membre et l'ID, et laisse la photo respirer au centre.
+     cover + center : l'image remplit la carte sans aucun étirement, et un
+     calque de fond ne peut ni masquer ni bloquer un élément interactif. */
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(12, 33, 73, 0.9) 0%,
+      rgba(12, 33, 73, 0.88) 22%,
+      rgba(12, 33, 73, 0.68) 45%,
+      rgba(12, 33, 73, 0.7) 58%,
+      rgba(12, 33, 73, 0.88) 80%,
+      rgba(12, 33, 73, 0.92) 100%
+    ),
+    url("showroom.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border: 1px solid rgba(212, 175, 55, 0.28);
   border-radius: 18px;
   box-shadow: 0 2px 6px rgba(10, 20, 45, 0.15);

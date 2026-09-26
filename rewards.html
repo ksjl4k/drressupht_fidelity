@@ -60,6 +60,11 @@
         </div>
       </div>
 
+      <!-- Mascot: sits between the membership card and the reward progress card -->
+      <div class="mascot-slot">
+        <img class="mascot" src="mascotte.png" width="800" height="1200" alt="Mascotte DressupHT" decoding="async">
+      </div>
+
       <!-- Reward progress + encouragement section (below the membership card) -->
       <section class="reward-nudge" id="reward-nudge" aria-label="Progression vers votre prochaine récompense">
         <span class="reward-nudge-badge">RÉCOMPENSE</span>
@@ -77,8 +82,6 @@
 
         <p class="reward-nudge-status" id="reward-nudge-status"></p>
         <p class="reward-nudge-message" id="reward-nudge-message">Vous vous rapprochez de votre prochaine récompense !</p>
-
-        <div class="reward-confetti" id="reward-confetti" aria-hidden="true"></div>
       </section>
 
       <div class="card">
@@ -107,6 +110,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Full-screen confetti layer (fixed, non-interactive) -->
+  <div class="reward-confetti" id="reward-confetti" aria-hidden="true"></div>
 
   <!-- Footer Section -->
   <footer class="site-footer">
