@@ -11,6 +11,122 @@ function getSquareBaseUrl() {
     : "https://connect.squareupsandbox.com";
 }
 
+type LoyaltyAwardEntry = {
+  entry_type: string;
+  points: number;
+  transaction_id?: string;
+};
+
+type LoyaltyAwardResult = {
+  status?: string;
+  reason?: string;
+  square_order_id?: string;
+  total_usd?: number;
+  eligible_usd?: number;
+  cashback_points?: number;
+  birthday_points?: number;
+  referral_points?: number;
+  points_balance?: number;
+  awarded?: LoyaltyAwardEntry[];
+  skipped?: Array<{ entry_type: string; reason: string }>;
+};
+
+// Awards DressupHT loyalty points for a purchase that has just been stored.
+//
+// The loyalty engine (public.award_dressupht_loyalty_for_purchase) is the only
+// place points are calculated. It reads the stored purchase row itself - the
+// customer, the Square order id, the order total, the currency and the line
+// items - so no part of the rules is duplicated here: this file contains no
+// exchange rate, no cashback rate, no threshold and no bonus amount, and it
+// never touches Square Loyalty.
+//
+// The Square order id remains the reference key, because the engine derives its
+// idempotency key from it. A redelivered webhook therefore returns
+// "no_new_awards" instead of crediting the order a second time.
+//
+// Failures are swallowed on purpose. The purchase is already persisted at this
+// point, and a loyalty problem must not make this webhook fail, because Square
+// would then redeliver the event and keep retrying.
+async function awardDressuphtLoyalty(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  purchaseId: string | null,
+  squareOrderId: string
+): Promise<void> {
+  if (!purchaseId) {
+    console.warn(
+      "Loyalty award skipped: purchase row id unavailable",
+      JSON.stringify({ square_order_id: squareOrderId, reason: "purchase_id_missing" })
+    );
+    return;
+  }
+
+  console.log(
+    "Loyalty award attempted",
+    JSON.stringify({ square_order_id: squareOrderId, purchase_id: purchaseId })
+  );
+
+  try {
+    const { data, error } = await supabaseAdmin.rpc(
+      "award_dressupht_loyalty_for_purchase",
+      { p_purchase_id: purchaseId }
+    );
+
+    if (error) {
+      console.error(
+        "Loyalty award error",
+        JSON.stringify({
+          square_order_id: squareOrderId,
+          purchase_id: purchaseId,
+          message: error.message,
+        })
+      );
+      return;
+    }
+
+    const result = (data ?? {}) as LoyaltyAwardResult;
+
+    const summary = {
+      square_order_id: squareOrderId,
+      status: result.status ?? "unknown",
+      eligible_usd: result.eligible_usd ?? null,
+      cashback_points: result.cashback_points ?? 0,
+      birthday_points: result.birthday_points ?? 0,
+      referral_points: result.referral_points ?? 0,
+      points_balance: result.points_balance ?? null,
+    };
+
+    if (result.status === "awarded") {
+      console.log(
+        "Loyalty award applied",
+        JSON.stringify({ ...summary, awarded: result.awarded ?? [] })
+      );
+      return;
+    }
+
+    if (result.status === "no_new_awards") {
+      console.log(
+        "Loyalty award already processed (idempotent, nothing awarded again)",
+        JSON.stringify({ ...summary, skipped: result.skipped ?? [] })
+      );
+      return;
+    }
+
+    console.log(
+      "Loyalty award skipped",
+      JSON.stringify({ ...summary, reason: result.reason ?? "unknown" })
+    );
+  } catch (err) {
+    console.error(
+      "Loyalty award error",
+      JSON.stringify({
+        square_order_id: squareOrderId,
+        purchase_id: purchaseId,
+        message: err instanceof Error ? err.message : String(err),
+      })
+    );
+  }
+}
+
 function generateDressupMemberId(firstName: string): string {
   const cleanFirstName = firstName
     .trim()
@@ -386,7 +502,9 @@ serve(async (req) => {
     }
 
     // Insert/update purchase record.
-    const { error: insertError } =
+    // The stored row id is requested as well: the loyalty engine is keyed on
+    // it, and reading it back here avoids a second lookup by order id.
+    const { data: savedPurchase, error: insertError } =
       await supabaseAdmin
         .from("purchases")
         .upsert(
@@ -400,7 +518,9 @@ serve(async (req) => {
           {
             onConflict: "square_order_id",
           }
-        );
+        )
+        .select("id")
+        .single();
 
     if (insertError) {
       console.error(
@@ -410,6 +530,17 @@ serve(async (req) => {
 
       throw new Error(insertError.message);
     }
+
+    // ---------------------------------------------------------
+    // LOYALTY (DressupHT engine, never Square Loyalty)
+    // ---------------------------------------------------------
+    // Runs only after the purchase is safely stored, and never throws: the
+    // response below must stay the one Square already expects.
+    await awardDressuphtLoyalty(
+      supabaseAdmin,
+      savedPurchase?.id ?? null,
+      squareOrderId
+    );
 
     return new Response(
       JSON.stringify({
