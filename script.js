@@ -163,3 +163,74 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+// Keep the field being typed in visible when the on-screen keyboard is up.
+// Mobile browsers (iOS Safari especially) keep the layout height unchanged and
+// instead shrink the visual viewport, so the keyboard can cover the focused
+// field even though getBoundingClientRect() still reports it inside the page.
+// Watching the visual viewport scrolls the layout so the active field stays in
+// the visible area above the keyboard.
+(function () {
+  const FIELDS = "input, textarea, select";
+  const GAP = 12;
+  const KEYBOARD_HINT = 40;
+
+  const isField = (el) => !!(el && el.matches && el.matches(FIELDS));
+
+  const keyboardIsUp = () => {
+    const vv = window.visualViewport;
+    return !!vv && window.innerHeight - vv.height > KEYBOARD_HINT;
+  };
+
+  const revealActiveField = () => {
+    const el = document.activeElement;
+    const vv = window.visualViewport;
+    if (!el || !vv || !isField(el)) return;
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const viewTop = vv.offsetTop;
+    const viewBottom = viewTop + vv.height;
+
+    if (rect.top >= viewTop + GAP && rect.bottom <= viewBottom - GAP) return;
+
+    // Scroll the layout viewport by exactly the amount the field is
+    // outside the visible area, leaving a small breathing room above the
+    // keyboard. The visible area is the same for layout and visual viewport
+    // when the page is not pinch-zoomed, so a plain window.scrollTo works.
+    let delta = 0;
+    if (rect.bottom > viewBottom - GAP) {
+      delta = rect.bottom - (viewBottom - GAP);
+    } else if (rect.top < viewTop + GAP) {
+      delta = rect.top - (viewTop + GAP);
+    }
+    if (!delta) return;
+
+    const limit = Math.max(0, (document.documentElement.scrollHeight || 0) - window.innerHeight);
+    const target = Math.min(Math.max(0, window.scrollY + delta), limit);
+    if (Math.abs(target - window.scrollY) > 1) window.scrollTo(0, target);
+  };
+
+  const onViewportChange = () => {
+    if (keyboardIsUp()) revealActiveField();
+  };
+
+  const vv = window.visualViewport;
+  if (vv && vv.addEventListener) {
+    vv.addEventListener("resize", onViewportChange);
+    vv.addEventListener("scroll", onViewportChange);
+  } else {
+    window.addEventListener("resize", onViewportChange);
+  }
+
+  // The keyboard closes/opens a moment after the field gains focus; run the
+  // reveal once it has settled so the field is never left underneath it.
+  document.addEventListener("focusin", (event) => {
+    if (!isField(event.target)) return;
+    const wait = window.setTimeout(() => {
+      revealActiveField();
+      window.clearTimeout(wait);
+    }, 350);
+  });
+})();
