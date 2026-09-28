@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DressupHT - Portail Entreprise</title>
+  <link rel="stylesheet" href="company.css">
+  <!-- Supabase JS from CDN, same as the customer site. No build step. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="mascotte.png" alt="DressupHT" class="logo">
+      <h1>DressupHT</h1>
+      <p>Portail Entreprise</p>
+
+      <!-- Employee identity: only shown once signed in. -->
+      <div id="account-bar" hidden>
+        <span id="user-email" class="account-email"></span>
+        <button type="button" id="logout-button" class="secondary logout">Se d&eacute;connecter</button>
+      </div>
+    </header>
+
+    <!-- Login -->
+    <div id="login-view">
+      <form id="login-form">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" autocomplete="username" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Mot de passe</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required>
+        </div>
+
+        <p id="error-message" class="error-message" role="alert" hidden></p>
+
+        <button type="submit" id="login-button">Se connecter</button>
+        <p id="loading-indicator" class="loading" hidden>Connexion en cours&hellip;</p>
+      </form>
+    </div>
+
+    <!-- Authenticated portal: employee tools. -->
+    <div id="portal-view" hidden>
+      <section class="card panel">
+        <h2>Recherche client</h2>
+        <p class="hint">Retrouvez la progression de fidelit&eacute; d'un membre par son ID DressupHT.</p>
+
+        <form id="lookup-form" novalidate>
+          <div class="form-group">
+            <label for="member-id">ID membre DressupHT</label>
+            <input
+              type="text"
+              id="member-id"
+              name="member_id"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              maxlength="128"
+              placeholder="ex. DRESSUP-123456"
+            >
+          </div>
+
+          <p id="lookup-error" class="error-message" role="alert" hidden></p>
+
+          <button type="submit" id="lookup-button">Rechercher</button>
+          <p id="lookup-loading" class="loading" hidden>Recherche en cours&hellip;</p>
+        </form>
+      </section>
+
+      <!-- Customer card: populated only from a successful lookup response. -->
+      <section id="result-card" class="card result-card" hidden>
+        <div class="result-header">
+          <div class="result-identity">
+            <h2 id="result-name">&nbsp;</h2>
+            <p id="result-member-id" class="result-subtitle"></p>
+          </div>
+          <span id="result-badge" class="badge">&nbsp;</span>
+        </div>
+
+        <dl class="detail-grid">
+          <div class="detail">
+            <dt>Email</dt>
+            <dd id="result-email">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>T&eacute;l&eacute;phone</dt>
+            <dd id="result-phone">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>Date de naissance</dt>
+            <dd id="result-birthday">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>ID client Square <span class="internal-tag">interne</span></dt>
+            <dd id="result-square-id">&mdash;</dd>
+          </div>
+        </dl>
+
+        <div class="points-panel">
+          <p class="points-label">Solde de points</p>
+          <p class="points-value" id="loyalty-balance">0</p>
+        </div>
+
+        <dl class="detail-grid stats">
+          <div class="detail">
+            <dt>Points &eacute;ligibles</dt>
+            <dd id="loyalty-eligible">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>Points gagn&eacute;s &agrave; vie</dt>
+            <dd id="loyalty-awarded">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>Points d&eacute;duits</dt>
+            <dd id="loyalty-deducted">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>Transactions</dt>
+            <dd id="loyalty-transactions">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>Taux USD/GDS</dt>
+            <dd id="loyalty-rate">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>Derni&egrave;re activit&eacute;</dt>
+            <dd id="loyalty-last-activity">&mdash;</dd>
+          </div>
+          <div class="detail">
+            <dt>Statut</dt>
+            <dd id="loyalty-status">&mdash;</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <script src="company.js"></script>
+</body>
+</html>

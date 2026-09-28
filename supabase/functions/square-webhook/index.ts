@@ -11,6 +11,96 @@ function getSquareBaseUrl() {
     : "https://connect.squareupsandbox.com";
 }
 
+// ---------------------------------------------------------
+// SQUARE WEBHOOK SIGNATURE VERIFICATION
+// ---------------------------------------------------------
+// Square signs every notification with HMAC-SHA256 over
+//
+//   notification_url + raw_request_body
+//
+// using the signature key of the webhook subscription, and sends the digest in
+// the x-square-hmacsha256-signature header. Both the notification URL and the
+// signature key are read from environment secrets; neither is written in this
+// file and neither has a default, so a misconfigured deployment fails closed
+// instead of silently accepting unsigned requests.
+//
+// The raw body is verified before it is parsed. Re-serializing parsed JSON
+// would change the bytes Square signed, so the exact text is used as received.
+
+const SQUARE_SIGNATURE_HEADER = "x-square-hmacsha256-signature";
+
+type SignatureCheck =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+// Square sends the digest base64 encoded.
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+async function verifySquareSignature(
+  rawBody: string,
+  providedSignature: string | null
+): Promise<SignatureCheck> {
+  if (!providedSignature) {
+    return { ok: false, reason: "signature_missing" };
+  }
+
+  const notificationUrl = Deno.env.get("SQUARE_WEBHOOK_NOTIFICATION_URL");
+  const signatureKey = Deno.env.get("SQUARE_WEBHOOK_SIGNATURE_KEY");
+
+  if (!notificationUrl || !signatureKey) {
+    return { ok: false, reason: "configuration_missing" };
+  }
+
+  let providedBytes: Uint8Array;
+
+  try {
+    providedBytes = base64ToBytes(providedSignature);
+  } catch {
+    return { ok: false, reason: "signature_malformed" };
+  }
+
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(signatureKey),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+
+    // crypto.subtle.verify recomputes the digest and compares the two MACs in
+    // constant time, which is why no hand written comparison is used here.
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      providedBytes,
+      new TextEncoder().encode(notificationUrl + rawBody)
+    );
+
+    return valid ? { ok: true } : { ok: false, reason: "signature_mismatch" };
+  } catch {
+    return { ok: false, reason: "signature_malformed" };
+  }
+}
+
+// Deliberately opaque: the caller only learns that the request was refused, and
+// nothing about the signature, the key, or the expected URL.
+function signatureRejected(): Response {
+  return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    headers: { "Content-Type": "application/json" },
+    status: 403,
+  });
+}
+
 type LoyaltyAwardEntry = {
   entry_type: string;
   points: number;
@@ -127,47 +217,73 @@ async function awardDressuphtLoyalty(
   }
 }
 
-function generateDressupMemberId(firstName: string): string {
-  const cleanFirstName = firstName
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "");
-
-  const randomNumber = Math.floor(100000 + Math.random() * 900000);
-
-  return `${cleanFirstName}-${randomNumber}`;
-}
-
-// Helper function to convert Square birthday (YYYY-MM-DD) to JJ/MM format (DD/MM)
-function formatBirthdayToJJMM(squareBirthday: string | null | undefined): string | null {
-  if (!squareBirthday) return null;
-
-  try {
-    const parts = squareBirthday.split(/[-/]/);
-    if (parts.length >= 3) {
-      // YYYY-MM-DD -> parts[1] is MM, parts[2] is DD (JJ)
-      const month = parts[1];
-      const day = parts[2];
-      return `${day}/${month}`;
-    } else if (parts.length === 2) {
-      // MM-DD -> DD/MM
-      return `${parts[1]}/${parts[0]}`;
-    }
-  } catch (e) {
-    console.error("Error parsing birthday:", e);
-  }
-
-  return null;
-}
 
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Authenticate before anything else. The body is read once, as text, and the
+  // signature is checked against those exact bytes before the JSON is parsed,
+  // before Supabase is contacted, and before the loyalty engine is reached.
+  let rawBody: string;
+
   try {
-    const payload = await req.json();
+    rawBody = await req.text();
+  } catch {
+    console.error(
+      "Square webhook signature verification failed",
+      JSON.stringify({ reason: "body_unreadable" })
+    );
+    return signatureRejected();
+  }
+
+  const providedSignature = req.headers.get(SQUARE_SIGNATURE_HEADER);
+  const signatureCheck = await verifySquareSignature(rawBody, providedSignature);
+
+  if (!signatureCheck.ok) {
+    console.error(
+      "Square webhook signature verification failed",
+      JSON.stringify({ reason: signatureCheck.reason })
+    );
+    return signatureRejected();
+  }
+
+  console.log("Square webhook signature verified");
+
+  try {
+    const payload = JSON.parse(rawBody);
     const eventType = payload.type;
+
+    // ---------------------------------------------------------
+    // PURCHASE EVENTS ONLY
+    // ---------------------------------------------------------
+    // This webhook turns Square orders into DressupHT loyalty and nothing else.
+    // The notification has already been authenticated above, so any event type
+    // that is not a purchase event is acknowledged here: it writes nothing,
+    // never reaches the loyalty engine, and Square receives a 200 so it stops
+    // redelivering.
+    //
+    // The request is authenticated at this point and the event type is known,
+    // so the check happens here, before any client is created and before any
+    // configuration is read: an event that is not processed cannot fail
+    // because of a secret it would never have used.
+    const PURCHASE_EVENT_TYPES = ["order.created", "order.updated"];
+
+    if (!PURCHASE_EVENT_TYPES.includes(eventType)) {
+      console.log(
+        "Square webhook event acknowledged without processing",
+        JSON.stringify({ event_type: eventType ?? null })
+      );
+
+      return new Response(
+        JSON.stringify({ message: "Event ignored" }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -181,231 +297,6 @@ serve(async (req) => {
     }
 
     const squareBaseUrl = getSquareBaseUrl();
-
-    // ---------------------------------------------------------
-    // CUSTOMER CREATED
-    // ---------------------------------------------------------
-
-    if (eventType === "customer.created") {
-      // Match the exact nesting structure from Square's webhook payload
-      const squareCustomer = payload.data?.object?.customer;
-
-      if (!squareCustomer) {
-        return new Response(
-          JSON.stringify({ message: "No customer found in webhook" }),
-          {
-            headers: { "Content-Type": "application/json" },
-            status: 200,
-          }
-        );
-      }
-
-      const squareCustomerId = squareCustomer.id;
-
-      if (!squareCustomerId) {
-        return new Response(
-          JSON.stringify({ message: "No Square customer ID found" }),
-          {
-            headers: { "Content-Type": "application/json" },
-            status: 200,
-          }
-        );
-      }
-
-      // Check whether this Square customer is already linked in Supabase.
-      const { data: linkedCustomer, error: linkedError } =
-        await supabaseAdmin
-          .from("customers")
-          .select("id, dressup_member_id, birthday")
-          .eq("square_customer_id", squareCustomerId)
-          .maybeSingle();
-
-      if (linkedError) {
-        throw new Error(
-          `Error checking linked customer: ${linkedError.message}`
-        );
-      }
-
-      // If not linked yet, the webhook may have raced the loyalty
-      // registration: the app already created the row with this member ID.
-      // Match on the DressupHT member ID to avoid duplicate rows.
-      const candidateMemberId = squareCustomer.reference_id || null;
-      let customerByMemberId = null;
-
-      if (!linkedCustomer && candidateMemberId) {
-        const { data: memberMatch, error: memberError } =
-          await supabaseAdmin
-            .from("customers")
-            .select("id, dressup_member_id, birthday")
-            .eq("dressup_member_id", candidateMemberId)
-            .limit(1)
-            .maybeSingle();
-
-        if (memberError) {
-          throw new Error(
-            `Error checking customer by member ID: ${memberError.message}`
-          );
-        }
-
-        customerByMemberId = memberMatch;
-      }
-
-      const existingCustomer = linkedCustomer || customerByMemberId;
-
-      // Reuse the existing DressupHT ID if this webhook is retried.
-      const dressupMemberId =
-        existingCustomer?.dressup_member_id ||
-        candidateMemberId ||
-        generateDressupMemberId(squareCustomer.given_name || "customer");
-
-      // Convert birthday from YYYY-MM-DD to JJ/MM and keep the existing
-      // value when Square has no birthday for this customer.
-      const formattedBirthday =
-        formatBirthdayToJJMM(squareCustomer.birthday) ||
-        existingCustomer?.birthday ||
-        null;
-
-      if (existingCustomer) {
-        // Link only when this row is unlinked or already points at this same
-        // Square customer. Concurrent customer.created events must not replace
-        // the first successful link with a different Square ID.
-        const { data: updatedCustomer, error: customerError } = await supabaseAdmin
-          .from("customers")
-          .update({
-            dressup_member_id: dressupMemberId,
-            first_name: squareCustomer.given_name || "Unknown",
-            last_name: squareCustomer.family_name || "Unknown",
-            email: squareCustomer.email_address || null,
-            phone: squareCustomer.phone_number || "UNKNOWN",
-            birthday: formattedBirthday,
-            square_customer_id: squareCustomerId,
-            square_sync_status: "completed",
-            square_sync_claim_token: null,
-            square_sync_lease_until: null,
-          })
-          .eq("id", existingCustomer.id)
-          .or(`square_customer_id.is.null,square_customer_id.eq.${squareCustomerId}`)
-          .select("id, square_customer_id")
-          .maybeSingle();
-
-        if (customerError) {
-          throw new Error(
-            `Error updating customer in Supabase: ${customerError.message}`
-          );
-        }
-
-        if (!updatedCustomer) {
-          console.error(
-            "Square customer link conflict; preserving the existing link:",
-            existingCustomer.id,
-            squareCustomerId
-          );
-
-          return new Response(
-            JSON.stringify({
-              success: true,
-              conflict: true,
-              message: "Customer is already linked to a different Square profile",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-              status: 200,
-            }
-          );
-        }
-      } else {
-        // New customer coming from Square (e.g. created by a cashier in PoS).
-        const { error: customerError } = await supabaseAdmin
-          .from("customers")
-          .insert({
-            dressup_member_id: dressupMemberId,
-            first_name: squareCustomer.given_name || "Unknown",
-            last_name: squareCustomer.family_name || "Unknown",
-            email: squareCustomer.email_address || null,
-            phone: squareCustomer.phone_number || "UNKNOWN",
-            birthday: formattedBirthday,
-            square_customer_id: squareCustomerId,
-            square_sync_status: "completed",
-            square_sync_claim_token: null,
-            square_sync_lease_until: null,
-          });
-
-        if (customerError) {
-          throw new Error(
-            `Error saving customer to Supabase: ${customerError.message}`
-          );
-        }
-      }
-
-      // If Square did not already have a DressupHT reference ID,
-      // write the generated DressupHT member ID back to Square.
-      if (squareCustomer.reference_id !== dressupMemberId) {
-        const updateResponse = await fetch(
-          `${squareBaseUrl}/v2/customers/${squareCustomerId}`,
-          {
-            method: "PUT",
-            headers: {
-              "Square-Version": SQUARE_VERSION,
-              "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              reference_id: dressupMemberId,
-              note: `DressupHT Member ID: ${dressupMemberId}`,
-              version: squareCustomer.version,
-            }),
-          }
-        );
-
-        const updateResult = await updateResponse.json();
-
-        if (!updateResponse.ok) {
-          console.error(
-            "Failed to update Square customer:",
-            updateResult
-          );
-
-          throw new Error(
-            `Square customer update failed: ${JSON.stringify(updateResult)}`
-          );
-        }
-      }
-
-      console.log(
-        `Customer synced: Square ${squareCustomerId} → ${dressupMemberId} with birthday: ${formattedBirthday}`
-      );
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Customer synced successfully",
-          square_customer_id: squareCustomerId,
-          dressup_member_id: dressupMemberId,
-          birthday: formattedBirthday,
-        }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    // ---------------------------------------------------------
-    // ORDER CREATED / UPDATED
-    // ---------------------------------------------------------
-
-    if (
-      eventType !== "order.updated" &&
-      eventType !== "order.created"
-    ) {
-      return new Response(
-        JSON.stringify({ message: "Event ignored" }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
 
     const squareOrderId =
       payload.data?.object?.order_updated?.order_id ||

@@ -5,12 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DressupHT - Mon Suivi de Récompenses</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Include Supabase and QR Code library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="config.js"></script>
+  <!--
+    This page is deliberately dormant: it is not linked from anywhere and it
+    reads nothing. Rewards are owned by DressupHT, not by Square Loyalty, and
+    the balance is a server-side calculation, so there is nothing on this page
+    that a visitor could be shown before the company portal exists.
+  -->
 </head>
-<body>
+<body data-loyalty-page="dormant">
   <div class="container">
     <!-- Back Button Header -->
     <div style="margin-bottom: 15px;">
@@ -21,74 +23,62 @@
 
     <header>
       <h1>Suivi de Récompenses</h1>
-      <p>Entrez vos informations pour consulter vos points et avantages.</p>
+      <p>Votre espace membre arrive bientôt. En attendant, l'équipe en boutique s'occupe de tout.</p>
     </header>
 
-    <!-- Login Form -->
-    <form id="rewards-login-form">
-      <div class="form-group">
-        <label for="ref-id">Identifiant (ex: jean-482910)</label>
-        <input type="text" id="ref-id" placeholder="prenom-123456" required>
-      </div>
-
-      <div class="form-group">
-        <label for="check-birthday">Date de naissance (JJ/MM)</label>
-        <input type="text" id="check-birthday" placeholder="JJ/MM" maxlength="5" required>
-      </div>
-
-      <button type="submit" id="login-btn">Voir mes récompenses</button>
-      <p id="error-message" class="error-text"></p>
-    </form>
-
-    <!-- Success View (Hidden by default) -->
-    <div id="rewards-dashboard" class="hidden">
-      <!-- Membership Card -->
-      <div class="membership-card">
-        <div class="membership-card-top">
-          <span class="membership-logo">DRESSUPHT</span>
-          <div class="membership-since">
-            <span class="membership-label">MEMBRE DEPUIS</span>
-            <span id="membership-since"></span>
-          </div>
-        </div>
-        <div class="membership-card-bottom">
-          <span class="membership-name" id="membership-card-name"></span>
-          <div class="membership-id-block">
-            <span class="membership-label">ID MEMBRE</span>
-            <span class="membership-id" id="membership-card-id"></span>
-          </div>
+    <!-- Membership Card: shown as a preview of the future member card -->
+    <div class="membership-card">
+      <div class="membership-card-top">
+        <span class="membership-logo">DRESSUPHT</span>
+        <div class="membership-since">
+          <span class="membership-label">MEMBRE DEPUIS</span>
+          <span id="membership-since">—</span>
         </div>
       </div>
+      <div class="membership-card-bottom">
+        <span class="membership-name" id="membership-card-name">Votre nom</span>
+        <div class="membership-id-block">
+          <span class="membership-label">ID MEMBRE</span>
+          <span class="membership-id" id="membership-card-id">—</span>
+        </div>
+      </div>
+    </div>
 
-      <!-- Mascot: sits between the membership card and the dashboard card -->
-      <div class="mascot-slot">
-        <img class="mascot" src="mascotte.png" width="800" height="1200" alt="Mascotte DressupHT" decoding="async">
+    <!-- Mascot: sits between the membership card and the dashboard card -->
+    <div class="mascot-slot">
+      <img class="mascot" src="mascotte.png" width="800" height="1200" alt="Mascotte DressupHT" decoding="async">
+    </div>
+
+    <div class="card">
+      <h2>Récompenses DressupHT</h2>
+      <p style="margin-top: 5px;">
+        Le programme de fidélité n'est pas encore accessible en ligne. Aucun identifiant ni mot de passe
+        n'est nécessaire&nbsp;: votre numéro de membre suffit en boutique.
+      </p>
+
+      <div class="points-box">
+        <p style="font-size: 0.9rem; margin: 0; color: #136f9a; font-weight: 600;">Solde de points :</p>
+        <span style="font-size: 2rem; font-weight: bold; color: #136f9a;">—</span>
+        <p style="font-size: 0.85rem; margin: 6px 0 0; color: #666;">
+          Demandez votre solde en boutique avec votre identifiant membre.
+        </p>
       </div>
 
-      <div class="card">
-        <h2>Bienvenue, <span id="dash-name"></span> !</h2>
-        <p style="margin-top: 5px;">ID: <strong id="dash-id"></strong></p>
-        
-        <div class="points-box">
-          <p style="font-size: 0.9rem; margin: 0; color: #136f9a; font-weight: 600;">Solde de points :</p>
-          <span id="dash-points" style="font-size: 2rem; font-weight: bold; color: #136f9a;">0</span> pts
-        </div>
+      <p style="text-align: left;">
+        Comment ça marche&nbsp;? Chaque achat admissible vous rapporte des points, calculés par DressupHT
+        au moment de la vente&nbsp;:
+      </p>
+      <ul style="text-align: left; font-size: 0.95rem; color: #2c3e50; padding-left: 20px;">
+        <li>À partir de 30&nbsp;$ de purchases, 5&nbsp;% du montant admissible sont convertis en points DressupHT.</li>
+        <li>Les articles exclus du programme ne comptent pas dans le montant admissible.</li>
+        <li>Un achat d'anniversaire ajoute une prime, et le parrainage est récompensé une seule fois.</li>
+        <li>Le taux de conversion est un paramètre du programme&nbsp;: il peut être ajusté par DressupHT.</li>
+      </ul>
 
-        <div class="qr-section">
-          <button type="button" id="qr-toggle-btn" class="secondary-btn">Afficher mon QR code</button>
-          <div id="qrcode" class="hidden"></div>
-        </div>
-
-        <!-- Purchase History Section -->
-        <div style="margin-top: 20px; text-align: left;">
-          <button type="button" id="history-toggle-btn" class="secondary-btn">Afficher l'historique des achats</button>
-          <div id="purchases-list" class="purchases-scroll hidden">
-            <!-- Dynamically populated purchases go here -->
-          </div>
-        </div>
-        
-        <button id="logout-btn" class="secondary-btn">Se déconnecter</button>
-      </div>
+      <p style="font-size: 0.85rem; color: #666; text-align: left;">
+        Le QR code, lorsqu'il sera disponible, contiendra uniquement votre identifiant membre&nbsp;:
+        ni points, ni informations personnelles. Le NFC n'est pas utilisé.
+      </p>
     </div>
   </div>
 

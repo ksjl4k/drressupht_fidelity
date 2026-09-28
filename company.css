@@ -1,0 +1,346 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Sora", sans-serif;
+}
+
+body {
+  background: #f8f6f2;
+  color: #2c3e50;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.container {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  padding: 24px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #136f9a;
+}
+
+h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #136f9a;
+  margin-bottom: 10px;
+}
+
+p {
+  color: #666;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+form {
+  margin-top: 15px;
+}
+
+label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #2c3e50;
+  background: #fff;
+}
+
+input:focus {
+  outline: none;
+  border-color: #136f9a;
+  box-shadow: 0 0 0 3px rgba(19, 111, 154, 0.12);
+}
+
+button {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #136f9a;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #0f5a7d;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: #ffffff;
+  color: #136f9a;
+  border: 1px solid #136f9a;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #f1f7fa;
+}
+
+.error-message {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fdecea;
+  border: 1px solid #f5c2bd;
+  color: #b3261e;
+  font-size: 13px;
+}
+
+.loading {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+}
+
+.card {
+  text-align: center;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------------
+   Signed-in portal
+   The rules above are the login screen and are left untouched. These
+   additions only apply to the authenticated view.
+   ------------------------------------------------------------------ */
+
+body.portal-mode {
+  justify-content: flex-start;
+  align-items: center;
+  padding: 24px 16px 40px;
+}
+
+body.portal-mode .container {
+  max-width: 760px;
+  padding: 24px 22px 28px;
+}
+
+#account-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e1ded8;
+}
+
+.account-email {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c3e50;
+  word-break: break-all;
+}
+
+button.logout {
+  width: auto;
+  margin-top: 0;
+  padding: 9px 16px;
+  font-size: 13px;
+}
+
+.panel {
+  text-align: left;
+}
+
+.panel h2 {
+  margin-bottom: 4px;
+}
+
+.panel .hint {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.result-card {
+  margin-top: 18px;
+  padding-top: 20px;
+  border-top: 1px solid #e1ded8;
+  text-align: left;
+}
+
+.result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.result-identity h2 {
+  margin-bottom: 2px;
+}
+
+.result-subtitle {
+  font-size: 13px;
+  color: #666;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #f1f7fa;
+  border: 1px solid #d0e7f9;
+  color: #136f9a;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-active,
+.badge-awarded,
+.badge-completed {
+  background: #f3e6bd;
+  border-color: #e9d9a0;
+  color: #8a6d1f;
+}
+
+.badge-inactive,
+.badge-blocked,
+.badge-unknown {
+  background: #f1f7fa;
+  border-color: #d0e7f9;
+  color: #666;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 16px;
+  margin: 0 0 18px;
+}
+
+.detail dt {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  margin-bottom: 3px;
+}
+
+.detail dd {
+  margin: 0;
+  font-size: 14px;
+  color: #2c3e50;
+  word-break: break-word;
+}
+
+.internal-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eee9e0;
+  color: #888;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+
+.points-panel {
+  margin: 4px 0 18px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: #136f9a;
+  color: #ffffff;
+  text-align: center;
+}
+
+.points-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.points-value {
+  margin-top: 4px;
+  color: #ffffff;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stats {
+  margin-bottom: 0;
+  padding-top: 16px;
+  border-top: 1px solid #e1ded8;
+}
+
+@media (max-width: 520px) {
+  body.portal-mode {
+    padding: 16px 10px 32px;
+  }
+
+  body.portal-mode .container {
+    padding: 20px 16px 24px;
+  }
+
+  .result-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .points-value {
+    font-size: 34px;
+  }
+}
