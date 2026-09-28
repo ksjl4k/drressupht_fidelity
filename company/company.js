@@ -61,6 +61,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const loyaltyLastActivity = document.getElementById("loyalty-last-activity");
   const loyaltyStatus = document.getElementById("loyalty-status");
 
+  const startScannerButton = document.getElementById("start-scanner");
+  const stopScannerButton = document.getElementById("stop-scanner");
+  const scannerPreview = document.getElementById("scanner-preview");
+  const scannerVideo = document.getElementById("scanner-video");
+  const scannerStatus = document.getElementById("scanner-status");
+
   const showError = (text) => {
     errorMessage.textContent = text;
     errorMessage.hidden = !text;
@@ -107,6 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const showLogin = (message) => {
     showError(message || "");
+    stopScanner();
     setLoading(false);
     clearResult();
     setLookupLoading(false);
@@ -259,12 +266,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- lookup ------------------------------------------------------------
 
-  // Submitting the form covers both the button and the Enter key.
-  lookupForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const memberId = memberIdInput.value.trim();
-
+  // Both the manual form and the QR scanner go through this one function, so
+  // the request contract and the rendering are always identical. It resolves
+  // with an outcome for the caller, but the manual form only cares about the
+  // on-screen result.
+  const performLookup = async (memberId) => {
     // Always start from a clean slate: no previous card, no previous error.
     clearResult();
     showLookupError("");
@@ -272,14 +278,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!memberId) {
       showLookupError(LOOKUP_MESSAGES.empty);
       memberIdInput.focus();
-      return;
+      return "empty";
     }
 
     const accessToken = await getAccessToken();
 
     if (!accessToken) {
       showLogin(LOOKUP_MESSAGES.unauthorized);
-      return;
+      return "unauthorized";
     }
 
     setLookupLoading(true);
@@ -299,39 +305,223 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!payload || !payload.customer || !payload.loyalty) {
           showLookupError(LOOKUP_MESSAGES.server);
-          return;
+          return "server";
         }
 
         renderResult(payload.customer, payload.loyalty);
-        return;
+        return "found";
       }
 
       if (response.status === 400) {
         showLookupError(LOOKUP_MESSAGES.invalid);
-        return;
+        return "invalid";
       }
 
       if (response.status === 401) {
         // The session is no longer accepted: back to the login screen.
         showLogin(LOOKUP_MESSAGES.unauthorized);
-        return;
+        return "unauthorized";
       }
 
       if (response.status === 403) {
         showLookupError(LOOKUP_MESSAGES.forbidden);
-        return;
+        return "forbidden";
       }
 
       if (response.status === 404) {
         showLookupError(LOOKUP_MESSAGES.notFound);
-        return;
+        return "not_found";
       }
 
       showLookupError(LOOKUP_MESSAGES.server);
+      return "server";
     } catch {
       showLookupError(LOOKUP_MESSAGES.offline);
+      return "offline";
     } finally {
       setLookupLoading(false);
     }
+  };
+
+  // Submitting the form covers both the button and the Enter key.
+  lookupForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    performLookup(memberIdInput.value.trim());
   });
+
+  // --- QR scanner --------------------------------------------------------
+  // The QR code only carries the customer's DressupHT member ID (e.g.
+  // "john-123456"). The camera is an input device and nothing more: its output
+  // is treated as untrusted text, validated like the manual field, then sent
+  // through performLookup() above, which re-reads the live session token on
+  // every call. The authenticated Edge Function + company_staff check remain
+  // the only authorization boundary; nothing from the QR is ever trusted for
+  // access.
+
+  const SCANNER_MESSAGES = {
+    ready: "Cam\u00e9ra non d\u00e9marr\u00e9e.",
+    starting: "Demande d'acc\u00e8s \u00e0 la cam\u00e9ra\u2026",
+    scanning: "En attente d'un QR code\u2026",
+    detected: "QR d\u00e9tect\u00e9 : recherche en cours\u2026",
+    invalid: "QR illisible : le code ne contient pas un ID membre DressupHT valide.",
+    unavailable: "Scanner indisponible dans ce navigateur : utilisez la recherche manuelle.",
+    noCamera: "Aucune cam\u00e9ra disponible sur cet appareil.",
+    permissionDenied: "Acc\u00e8s cam\u00e9ra refus\u00e9 : autorisez la cam\u00e9ra, puis r\u00e9essayez.",
+    cameraError: "Impossible de d\u00e9marrer la cam\u00e9ra.",
+    found: "Membre trouv\u00e9.",
+    notFound: "Aucun membre trouv\u00e9 pour ce QR code.",
+    forbidden: "Acc\u00e8s refus\u00e9 par le serveur.",
+    server: LOOKUP_MESSAGES.server,
+    offline: LOOKUP_MESSAGES.offline,
+  };
+
+  const SCANNER_STATUS_CLASSES = ["is-active", "is-error", "is-success"];
+
+  const setScannerStatus = (key) => {
+    scannerStatus.textContent = SCANNER_MESSAGES[key] || "";
+    for (const stateClass of SCANNER_STATUS_CLASSES) scannerStatus.classList.remove(stateClass);
+    if (key === "starting" || key === "scanning" || key === "detected") {
+      scannerStatus.classList.add("is-active");
+    } else if (key === "unavailable" || key === "noCamera" || key === "permissionDenied" || key === "cameraError" || key === "invalid" || key === "server" || key === "offline") {
+      scannerStatus.classList.add("is-error");
+    } else if (key === "found") {
+      scannerStatus.classList.add("is-success");
+    }
+  };
+
+  const setScannerButtons = (scanning) => {
+    startScannerButton.hidden = scanning;
+    stopScannerButton.hidden = !scanning;
+  };
+
+  let qrScanner = null;
+  let cameraOn = false;
+
+  const ensureScanner = () => {
+    if (!qrScanner) {
+      qrScanner = new QrScanner(scannerVideo, onQrDecoded, {
+        returnDetailedScanResult: true,
+      });
+    }
+    return qrScanner;
+  };
+
+  // Releases the camera and the video stream. Called on every end of scanning:
+  // after a successful or rejected read, on the stop button, on an error, and
+  // whenever the employee returns to the login screen (showLogin).
+  const stopScanner = () => {
+    if (qrScanner) {
+      try {
+        qrScanner.stop();
+      } catch {
+        // Already released by the browser; nothing else to do.
+      }
+    }
+    cameraOn = false;
+    scannerPreview.hidden = true;
+    scannerVideo.srcObject = null;
+    setScannerButtons(false);
+  };
+
+  // Member IDs are generated on the signup form as "firstname-6digits" (e.g.
+  // jean-482910) and only ever contain letters, digits and a hyphen. This
+  // check stays deliberately lenient on that shape but rejects content that
+  // can never be a member ID (a URL, an email, spaces), before any request.
+  const sanitizeScannedId = (raw) => {
+    if (typeof raw !== "string") return null;
+    const id = raw.trim();
+    if (!id || id.length > 128) return null;
+    if (/[^A-Za-z0-9-]/.test(id)) return null;
+    return id;
+  };
+
+  const scanOutcomeStatus = (outcome) => {
+    if (outcome === "found") return "found";
+    if (outcome === "not_found") return "notFound";
+    if (outcome === "invalid") return "invalid";
+    if (outcome === "forbidden") return "forbidden";
+    if (outcome === "server") return "server";
+    if (outcome === "offline") return "offline";
+    return null; // "unauthorized" already sent the employee back to login
+  };
+
+  const onQrDecoded = async (raw) => {
+    // The camera is released immediately, before the value is even inspected,
+    // so no stream is left running in the background.
+    stopScanner();
+
+    const payload = typeof raw === "string" ? raw : raw ? raw.data : "";
+    const memberId = sanitizeScannedId(payload);
+
+    if (!memberId) {
+      setScannerStatus("invalid");
+      return;
+    }
+
+    setScannerStatus("detected");
+    const outcome = await performLookup(memberId);
+    const statusKey = scanOutcomeStatus(outcome);
+    if (statusKey) setScannerStatus(statusKey);
+  };
+
+  startScannerButton.addEventListener("click", async () => {
+    if (cameraOn) return;
+
+    clearResult();
+    showLookupError("");
+    setScannerStatus("starting");
+    setScannerButtons(true);
+    scannerPreview.hidden = false;
+
+    if (typeof QrScanner === "undefined") {
+      setScannerStatus("unavailable");
+      stopScanner();
+      return;
+    }
+
+    try {
+      const hasCamera = await QrScanner.hasCamera();
+      if (hasCamera === false) {
+        setScannerStatus("noCamera");
+        stopScanner();
+        return;
+      }
+    } catch {
+      // hasCamera may fail on odd devices; start() below reports the real
+      // permission and camera errors.
+    }
+
+    try {
+      const scanner = ensureScanner();
+      await scanner.start();
+      cameraOn = true;
+      setScannerStatus("scanning");
+    } catch (err) {
+      const name = err && err.name;
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setScannerStatus("permissionDenied");
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setScannerStatus("noCamera");
+      } else {
+        setScannerStatus("cameraError");
+      }
+      stopScanner();
+    }
+  });
+
+  stopScannerButton.addEventListener("click", () => {
+    stopScanner();
+    setScannerStatus("ready");
+  });
+
+  // Safety net if the page is torn down while the camera is running. The
+  // browser would release the stream by itself, but stopping explicitly is
+  // cleaner and avoids a blinking light on some devices.
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("pagehide", () => stopScanner());
+  }
+
+  // Initial scanner state; the ready message is set here so the "Ready to
+  // scan" label is deterministic regardless of how the HTML was served.
+  setScannerStatus("ready");
 });

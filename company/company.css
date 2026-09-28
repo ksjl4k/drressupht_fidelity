@@ -344,3 +344,85 @@ button.logout {
     font-size: 34px;
   }
 }
+
+/* ------------------------------------------------------------------
+   QR scanner
+   New portal feature. The rules above (login + result cards) are left
+   untouched; these additions only style the camera panel.
+   ------------------------------------------------------------------ */
+
+.scanner-panel {
+  margin-bottom: 2px;
+  padding: 16px 18px;
+  border: 1px solid #d0e7f9;
+  border-radius: 12px;
+  background: #f1f7fa;
+}
+
+.scanner-panel h2 {
+  margin-bottom: 4px;
+}
+
+.scanner-panel .hint {
+  margin-bottom: 14px;
+}
+
+.scanner-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.scanner-actions button {
+  flex: 1;
+  margin-top: 0;
+}
+
+.scanner-preview {
+  margin-top: 14px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f1b2d;
+}
+
+.scanner-video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.scanner-status {
+  margin-top: 12px;
+  min-height: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #666;
+  text-align: center;
+}
+
+.scanner-status.is-active {
+  color: #136f9a;
+  font-weight: 600;
+}
+
+.scanner-status.is-error {
+  color: #b3261e;
+  font-weight: 600;
+}
+
+.scanner-status.is-success {
+  color: #0f7d4d;
+  font-weight: 600;
+}
+
+.or-divider {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #999;
+  text-align: center;
+}

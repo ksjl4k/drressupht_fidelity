@@ -7,6 +7,10 @@
   <link rel="stylesheet" href="company.css">
   <!-- Supabase JS from CDN, same as the customer site. No build step. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- QR scanning: qr-scanner (Nimiq), small UMD build that loads its worker
+       from the same CDN path. Loaded lazily by the browser; the camera is only
+       requested when an employee presses "Scanner le QR code". -->
+  <script src="https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.umd.min.js" defer></script>
   <script src="config.js"></script>
 </head>
 <body>
@@ -45,6 +49,28 @@
 
     <!-- Authenticated portal: employee tools. -->
     <div id="portal-view" hidden>
+      <!-- QR scanner: the primary lookup method.
+           The camera is only requested after the employee presses start. The QR
+           payload is treated as untrusted input and only ever yields a DressupHT
+           member ID; it is not used for authorization. -->
+      <section class="card panel scanner-panel">
+        <h2>Scanner le QR code</h2>
+        <p class="hint">Demandez au membre de pr&eacute;senter le QR code DressupHT de son t&eacute;l&eacute;phone, puis scannez-le.</p>
+
+        <div class="scanner-actions">
+          <button type="button" id="start-scanner">Scanner le QR code</button>
+          <button type="button" id="stop-scanner" class="secondary" hidden>Arr&ecirc;ter le scanner</button>
+        </div>
+
+        <div id="scanner-preview" class="scanner-preview" hidden>
+          <video id="scanner-video" class="scanner-video" playsinline muted></video>
+        </div>
+
+        <p id="scanner-status" class="scanner-status" role="status" aria-live="polite">Cam&eacute;ra non d&eacute;marr&eacute;e.</p>
+      </section>
+
+      <p class="or-divider">ou</p>
+
       <section class="card panel">
         <h2>Recherche client</h2>
         <p class="hint">Retrouvez la progression de fidelit&eacute; d'un membre par son ID DressupHT.</p>
